@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aurora Bot — an AFK bot that never logs off</title><link rel="icon" type="image/png" href="/aurora-bot.png"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&display=swap"><link rel="stylesheet" href="/styles.css">
+<style>
+.nav{position:fixed;inset:12px 16px auto;display:flex;justify-content:space-between;align-items:center;z-index:40}
+.hero{min-height:100vh;display:grid;place-items:center;text-align:center;padding:90px 20px 40px}
+.title{font:700 clamp(54px,15vw,190px)/.9 var(--font-display);display:flex;justify-content:center;margin:0}
+.title span{display:inline-block;background:linear-gradient(180deg,#fff 20%,var(--accent) 70%,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent;opacity:0;will-change:transform,opacity;animation:drop .9s cubic-bezier(.2,.85,.25,1) both paused;animation-delay:calc(var(--i)*.08s)}.go .title span{animation-play-state:running}
+@keyframes drop{from{opacity:0;transform:translate3d(0,-70px,0)}to{opacity:1;transform:none}}
+.mascot{width:min(240px,50vw);image-rendering:pixelated;border:3px solid var(--line2);box-shadow:8px 8px 0 rgba(0,0,0,.5),0 0 40px rgba(150,100,255,.5);transition:transform .2s;display:block}.fl{display:inline-block;margin-bottom:28px;animation:float 4s ease-in-out infinite}
+@keyframes float{50%{transform:translate3d(0,-14px,0)}}
+.hero p{max-width:46ch;margin:20px auto 28px;color:var(--muted);font-size:18px}
+.scene{height:420vh}.stick{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden}
+.sky{position:absolute;inset:0;background:linear-gradient(#3a7bd5,#f6b26b 78%)}.night{position:absolute;inset:0;background:linear-gradient(#070520,#1b1250 80%);opacity:0}
+.orb{position:absolute;width:64px;height:64px;background:#ffe27a;box-shadow:0 0 60px #ffd45e}.moon{background:#e8e4ff;box-shadow:0 0 50px #b9a8ff;opacity:0}
+.ground{position:absolute;left:0;right:0;bottom:0;height:26vh;background:linear-gradient(#5ec45a 0 18px,#3d9a43 18px 26px,#7a5230 26px);background-size:100% 100%;border-top:4px solid #2d6e33}
+.ground::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 47px,rgba(0,0,0,.18) 47px 49px)}
+.walker{position:absolute;bottom:calc(26vh - 6px);width:120px;image-rendering:pixelated;border:3px solid #1b1250;animation:bob .5s steps(2) infinite}@keyframes bob{50%{transform:translate3d(0,-8px,0)}}
+.flag{position:absolute;bottom:26vh;width:6px;height:90px;background:#3b2a17}.flag::before{content:"";position:absolute;left:6px;top:0;width:44px;height:28px;background:#555;transition:.3s}.flag.lit::before{background:var(--aur);box-shadow:0 0 24px var(--aur)}
+.caps{position:absolute;left:0;right:0;top:16vh;text-align:center;padding:0 20px}
+.cap{position:absolute;left:0;right:0;opacity:0;transform:translateY(20px);transition:.5s}.cap.on{opacity:1;transform:none}
+.cap h2{font-size:clamp(30px,5vw,64px);color:#fff;text-shadow:4px 4px 0 rgba(0,0,0,.45)}.cap p{color:#fff;font-size:18px;text-shadow:2px 2px 0 rgba(0,0,0,.5);margin:8px 0 0}
+.hz{height:340vh}.hz .stick{display:flex;align-items:center}.track{display:flex;gap:28px;padding:0 8vw;will-change:transform}
+.card{flex:none;width:min(420px,78vw);min-height:340px;padding:26px;display:flex;flex-direction:column;justify-content:space-between}
+.card h3{font-size:30px;margin-bottom:10px}.card p{color:var(--muted)}.card .ic{font:700 64px var(--font-display);color:var(--aur)}
+.sec{max-width:980px;margin:0 auto;padding:12vh 24px}.sec>h2{font-size:clamp(30px,5vw,56px);margin-bottom:26px}
+.term{background:#04030d;border:2px solid var(--line2);padding:20px;font:14px/1.7 var(--font-mono);min-height:250px;box-shadow:6px 6px 0 rgba(0,0,0,.5)}.term .c{color:var(--aur)}.term .w{color:var(--warn)}.term .s{color:#8fd4ff}.term .m{color:var(--text-faint)}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;counter-reset:s}.steps .panel{counter-increment:s}.steps .panel::before{content:counter(s);display:block;font:700 56px var(--font-display);color:var(--accent)}
+.steps h3{font-size:22px;margin:4px 0 6px}.steps p{margin:0;color:var(--muted)}
+.cta{text-align:center;padding:14vh 20px 10vh}.cta h2{font-size:clamp(34px,7vw,92px);line-height:1}
+@media(max-width:800px){.steps{grid-template-columns:1fr}.scene{height:340vh}.hz{height:300vh}.hero p{font-size:16px}
+.nav{inset:8px 10px auto}.nav .brand span{display:none}.walker{width:76px}.orb{width:44px;height:44px}.caps{top:12vh}.cap p{font-size:15px}.ground{height:22vh}.walker{bottom:calc(22vh - 6px)}.flag{bottom:22vh;height:64px}.flag::before{width:30px;height:20px}
+.track{gap:16px;padding:0 6vw}.card{min-height:280px;padding:20px}.card h3{font-size:24px}.card .ic{font-size:48px}.sec{padding:9vh 18px}.term{font-size:12px;padding:14px;min-height:220px}.cta{padding:10vh 18px 8vh}}
+@media(hover:none){#glow{display:none}}
+</style></head><body>
+<nav class="nav"><a class="brand" href="/" style="text-decoration:none;color:var(--text)"><img class="brand-mark" src="/aurora-bot.png" alt="">Aurora Bot</a><a class="button button-primary magnet" href="/login">Sign in <span>→</span></a></nav>
+
+<header class="hero"><div>
+<div class="fl"><img class="mascot" id="mascot" src="/aurora-bot.png" alt="Aurora Bot mascot"></div>
+<h1 class="title" aria-label="Aurora"><span style="--i:0">A</span><span style="--i:1">U</span><span style="--i:2">R</span><span style="--i:3">O</span><span style="--i:4">R</span><span style="--i:5">A</span></h1>
+<p>Your Minecraft AFK bot, online while you sleep. A private panel where everyone runs their own bot.</p>
+<a class="button button-primary magnet" href="/login">Open the panel <span>→</span></a>
+</div></header>
+
+<section class="scene" id="scene"><div class="stick">
+<div class="sky"></div><div class="night" id="night"></div>
+<div class="orb" id="sun"></div><div class="orb moon" id="moon"></div>
+<div class="caps">
+<div class="cap on"><h2>It logs itself in.</h2><p>Registers and signs in on AuthMe servers, and accepts teleport requests.</p></div>
+<div class="cap"><h2>It walks your farm.</h2><p>Record checkpoints once, then send the bot to any of them.</p></div>
+<div class="cap"><h2>It gets back up.</h2><p>Kicked or disconnected? It reconnects, and a watchdog un-sticks it.</p></div>
+<div class="cap"><h2>It's still there at night.</h2><p>Replies to chat and whispers while you're away.</p></div>
+</div>
+<div class="ground"></div>
+<div class="flag" style="left:30%"></div><div class="flag" style="left:52%"></div><div class="flag" style="left:74%"></div>
+<img class="walker" id="walker" src="/aurora-bot.png" alt="">
+</div></section>
+
+<section class="hz" id="hz"><div class="stick"><div class="track" id="track">
+<div class="panel card"><div class="ic">&gt;_</div><div><h3>Live console</h3><p>Server chat, bot events and your own commands, streaming as they happen.</p></div></div>
+<div class="panel card"><div class="ic">3D</div><div><h3>Live view</h3><p>Open a 3D render of what your bot sees, right inside the panel.</p></div></div>
+<div class="panel card"><div class="ic">⚑</div><div><h3>Farm routes</h3><p>Save named checkpoints along a walkable path and send the bot to any of them.</p></div></div>
+<div class="panel card"><div class="ic">♥</div><div><h3>Health and hunger</h3><p>Hearts, food, position and ping, updated live from the bot.</p></div></div>
+<div class="panel card"><div class="ic">⌂</div><div><h3>Your bot, only yours</h3><p>Every account has its own connection, chat log and route. Nothing is shared.</p></div></div>
+</div></div></section>
+
+<section class="sec"><h2 data-reveal>See what it says.</h2><div class="term" id="term" data-reveal></div></section>
+
+<section class="sec"><h2 data-reveal>Three steps to your bot.</h2>
+<div class="steps"><div class="panel" data-reveal><h3>Get an account</h3><p>Sign-up is closed. The admin creates your login.</p></div><div class="panel" data-reveal style="--d:.1s"><h3>Sign in</h3><p>Open the panel and enter your server, port and bot name.</p></div><div class="panel" data-reveal style="--d:.2s"><h3>Start the bot</h3><p>Press Start bot and watch it join in the console.</p></div></div></section>
+
+<section class="cta"><h2 data-reveal>Go AFK.<br>Stay online.</h2><p data-reveal class="lede" style="margin:18px auto 28px">Access is by invitation only.</p><a class="button button-primary magnet" href="/login">Sign in <span>→</span></a>
+<div class="footer" style="justify-content:center;border:0;margin-top:80px"><span>Aurora Bot</span><span>Built by <strong>thecoolguy0077</strong></span></div></section>
+
+<script src="/fx.js"></script>
+<script>
+const $=s=>document.querySelector(s),clamp=v=>Math.max(0,Math.min(1,v)),prog=el=>{const r=el.getBoundingClientRect();return clamp(-r.top/(r.height-innerHeight))};
+const caps=[...document.querySelectorAll('.cap')],flags=[...document.querySelectorAll('.flag')],track=$('#track');
+function tick(){
+  let p=prog($('#scene'));
+  $('#night').style.opacity=clamp((p-.55)*3);$('#sun').style.opacity=1-clamp((p-.35)*3);$('#moon').style.opacity=clamp((p-.6)*3);
+  $('#sun').style.left=`${8+p*60}%`;$('#sun').style.top=`${50-Math.sin(clamp(p*1.3)*Math.PI)*38}%`;$('#moon').style.left=`${45+p*40}%`;$('#moon').style.top=`${22-p*8}%`;
+  $('#walker').style.left=`${4+p*84}%`;
+  flags.forEach((f,i)=>f.classList.toggle('lit',p>[.22,.45,.7][i]));
+  const a=Math.min(3,Math.floor(p*4));caps.forEach((c,i)=>c.classList.toggle('on',i===a));
+  let h=prog($('#hz'));track.style.transform=`translateX(${-h*(track.scrollWidth-innerWidth)}px)`;
+}
+addEventListener('scroll',tick,{passive:true});addEventListener('resize',tick);tick();
+document.fonts.ready.then(()=>requestAnimationFrame(()=>document.body.classList.add('go')));setTimeout(()=>document.body.classList.add('go'),1500);
+const m=$('#mascot');addEventListener('pointermove',e=>{m.style.transform=`perspective(600px) rotateY(${(e.clientX/innerWidth-.5)*22}deg) rotateX(${(.5-e.clientY/innerHeight)*18}deg)`},{passive:true});
+const L=[['m','[12:01:04] Connecting to your server...'],['s','[12:01:06] Logged in. /login accepted.'],['c','[12:01:07] Bot online. AFK movement started.'],['s','[12:14:40] <Steve> hello'],['c','[12:14:41] Bot: Hello! Try !help'],['w','[12:30:12] Kicked: connection reset'],['c','[12:30:20] Reconnected. Back online.']];
+new IntersectionObserver((es,o)=>{if(!es[0].isIntersecting)return;o.disconnect();const t=$('#term');L.forEach(([c,x],i)=>setTimeout(()=>{t.insertAdjacentHTML('beforeend',`<div class="${c}">${x}</div>`)},i*700))},{threshold:.5}).observe($('#term'));
+</script></body></html>

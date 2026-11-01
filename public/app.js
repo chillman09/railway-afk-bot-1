@@ -17,6 +17,13 @@ function renderVersionOptions(versions) {
   });
 }
 
+function pips(id, v, c) {
+  const el = document.querySelector(id).closest('.spec'); let box = el.querySelector('.pips');
+  if (!box) { box = document.createElement('div'); box.className = 'pips'; el.appendChild(box); }
+  box.style.setProperty('--c', c);
+  box.innerHTML = Array.from({ length: 10 }, (_, i) => `<i class="pip ${v >= (i + 1) * 2 ? 'on' : v === i * 2 + 1 ? 'half' : ''}"></i>`).join('');
+}
+
 function updateState(state) {
   const status = document.querySelector('#status');
   status.textContent = state.status[0].toUpperCase() + state.status.slice(1);
@@ -29,6 +36,8 @@ function updateState(state) {
   document.querySelector('#navigation-mode').textContent = state.navigation[0].toUpperCase() + state.navigation.slice(1);
   document.querySelector('#health').textContent = state.health ?? '--';
   document.querySelector('#food').textContent = state.food ?? '--';
+  pips('#health', Number(state.health) || 0, '#ff5a7a');
+  pips('#food', Number(state.food) || 0, '#ffb04d');
   document.querySelector('#position').textContent = state.position ?? '--';
   document.querySelector('#ping').textContent = state.ping ?? '--';
   const viewerButton = document.querySelector('#toggle-viewer');
@@ -183,3 +192,14 @@ document.querySelector('#toggle-viewer').addEventListener('click', withLoading(d
 }));
 
 setInterval(() => { document.querySelector('#clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }, 1000);
+const tabBtns = [...document.querySelectorAll('[data-tab]')], tabViews = [...document.querySelectorAll('[data-view]')];
+function showTab(name) {
+  if (!tabViews.some(v => v.dataset.view === name)) name = 'console';
+  tabBtns.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  tabViews.forEach(v => v.classList.toggle('active', v.dataset.view === name));
+  history.replaceState(null, '', '#' + name);
+  window.scrollTo(0, 0);
+  if (name === 'console') consoleElement.scrollTop = consoleElement.scrollHeight;
+}
+tabBtns.forEach(t => t.addEventListener('click', () => showTab(t.dataset.tab)));
+showTab(location.hash.slice(1) || 'console');
