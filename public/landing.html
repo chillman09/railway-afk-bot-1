@@ -33,22 +33,25 @@
 .track{gap:16px;padding:0 6vw}.card{min-height:280px;padding:20px}.card h3{font-size:24px}.card .ic{font-size:48px}.sec{padding:9vh 18px}.term{font-size:12px;padding:14px;min-height:220px}.cta{padding:10vh 18px 8vh}}
 @media(hover:none){#glow{display:none}}
 
-.marq{overflow:hidden;border-block:2px solid var(--line);background:rgba(127,77,255,.12);padding:14px 0;transform:rotate(-1.2deg);margin:6vh -2vw}
+.marq{overflow:hidden;border-block:2px solid var(--line);background:rgba(var(--tint),.12);padding:14px 0;transform:rotate(-1.2deg);margin:6vh -2vw}
 .marq div{display:flex;gap:44px;width:max-content;font:700 22px var(--font-display);color:var(--accent);animation:mq 22s linear infinite;white-space:nowrap}.marq b{color:var(--aur)}
 @keyframes mq{to{transform:translate3d(-50%,0,0)}}
 .pv{padding:10vh 20px;text-align:center}.pv h2{font-size:clamp(30px,5vw,56px);margin-bottom:6vh}
-.win{max-width:900px;margin:0 auto;border:2px solid var(--line2);background:#0d0a28;box-shadow:12px 12px 0 rgba(0,0,0,.5),0 0 90px rgba(127,77,255,.35);text-align:left;transform-origin:50% 0;will-change:transform}
+.win{max-width:900px;margin:0 auto;border:2px solid var(--line2);background:#0d0a28;box-shadow:12px 12px 0 rgba(0,0,0,.5),0 0 90px rgba(var(--tint),.35);text-align:left;transform-origin:50% 0;will-change:transform}
 .win-bar{display:flex;align-items:center;gap:7px;padding:10px 14px;border-bottom:2px solid var(--line);font:12px var(--font-mono);color:var(--muted)}.win-bar i{width:11px;height:11px;background:var(--danger)}.win-bar i+i{background:var(--warn)}.win-bar i+i+i{background:var(--ok)}.win-bar span{margin-left:10px}
-.win-body{display:grid;grid-template-columns:150px 1fr}.win-side{padding:14px;border-right:2px solid var(--line);display:grid;gap:8px;align-content:start;font:700 14px var(--font-display);color:var(--muted)}.win-side b{padding:8px 10px;border:2px solid transparent}.win-side b:first-child{color:#fff;border-color:var(--line2);background:rgba(127,77,255,.35)}
-.win-main{padding:16px;display:grid;gap:12px}.win-banner{display:flex;gap:14px;align-items:center;padding:14px;border:2px solid var(--line);background:rgba(127,77,255,.18)}.win-banner .dot{width:26px;height:26px;background:var(--ok);box-shadow:var(--glow-ok);animation:orb 2.4s ease-in-out infinite}.win-banner small{display:block;color:var(--muted);font-size:11px}.win-banner strong{font:700 26px var(--font-display)}
+.win-body{display:grid;grid-template-columns:150px 1fr}.win-side{padding:14px;border-right:2px solid var(--line);display:grid;gap:8px;align-content:start;font:700 14px var(--font-display);color:var(--muted)}.win-side b{padding:8px 10px;border:2px solid transparent}.win-side b:first-child{color:#fff;border-color:var(--line2);background:rgba(var(--tint),.35)}
+.win-main{padding:16px;display:grid;gap:12px}.win-banner{display:flex;gap:14px;align-items:center;padding:14px;border:2px solid var(--line);background:rgba(var(--tint),.18)}.win-banner .dot{width:26px;height:26px;background:var(--ok);box-shadow:var(--glow-ok);animation:orb 2.4s ease-in-out infinite}.win-banner small{display:block;color:var(--muted);font-size:11px}.win-banner strong{font:700 26px var(--font-display)}
 .win-v{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.win-v div{border:2px solid var(--line);padding:10px;font-size:12px;color:var(--muted)}.win-v strong{display:block;font:700 18px var(--font-display);color:var(--text)}
 .win-log{background:#04030d;border:2px solid var(--line);padding:12px;font:12px/1.7 var(--font-mono);color:var(--aur)}.win-log span{color:var(--text-faint)}
 @media(max-width:800px){.win-side{display:none}.win-body{grid-template-columns:1fr}.marq{font-size:18px}.marq div{font-size:18px}.win-v{grid-template-columns:1fr 1fr}}
-</style></head><body>
+#boot{position:fixed;inset:0;background:var(--bg);z-index:300;display:grid;place-items:center;transition:opacity .5s}#boot.out{opacity:0;pointer-events:none}
+#boot .bt{width:min(380px,84vw);font:14px/1.8 var(--font-mono);color:var(--aur)}#boot .bar{height:14px;border:2px solid var(--line2);margin-top:14px}#boot .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--aur));transition:width .3s steps(5)}
+.mw{position:relative;display:block;transition:transform .2s}.eye{position:absolute;top:46%;width:7.5%;height:7.5%;transform:translate(-50%,-50%);background:#f3d2ff;box-shadow:0 0 16px #d98bff;opacity:.8;mix-blend-mode:screen;transition:transform .08s}
+</style></head><body><div id="boot"><div class="bt"><p></p><div class="bar"><i></i></div></div></div>
 <nav class="nav"><a class="brand" href="/" style="text-decoration:none;color:var(--text)"><img class="brand-mark" src="/aurora-bot.png" alt="">Aurora Bot</a><a class="button button-primary magnet" href="/login">Sign in <span>→</span></a></nav>
 
 <header class="hero"><div>
-<div class="fl"><img class="mascot" id="mascot" src="/aurora-bot.png" alt="Aurora Bot mascot"></div>
+<div id="pm"><div class="fl"><div class="mw" id="mw"><img class="mascot" src="/aurora-bot.png" alt="Aurora Bot mascot"><i class="eye" style="left:37.6%"></i><i class="eye" style="left:56.4%"></i></div></div></div>
 <h1 class="title" aria-label="Aurora"><span style="--i:0">A</span><span style="--i:1">U</span><span style="--i:2">R</span><span style="--i:3">O</span><span style="--i:4">R</span><span style="--i:5">A</span></h1>
 <p>Your Minecraft AFK bot, online while you sleep. A private panel where everyone runs their own bot.</p>
 <a class="button button-primary magnet" href="/login">Open the panel <span>→</span></a>
@@ -82,7 +85,7 @@
 <div class="win" id="win"><div class="win-bar"><i></i><i></i><i></i><span>aurora-bot / panel</span></div>
 <div class="win-body"><div class="win-side"><b>&gt;_ Console</b><b>⚑ Route</b><b>◉ Live view</b><b>⚙ Settings</b></div>
 <div class="win-main"><div class="win-banner"><span class="dot"></span><div><small>Connection</small><strong>Online</strong></div></div>
-<div class="win-v"><div>Health<div class="pips" style="--c:#ff5a7a"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i></div></div><div>Hunger<div class="pips" style="--c:#ffb04d"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i><i class="pip"></i></div></div><div>Latency<strong>42 ms</strong></div></div>
+<div class="win-v"><div>Health<div class="pips" style="--c:#ff5a7a"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i></div></div><div>Hunger<div class="pips" style="--c:#ffb04d"><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip on"></i><i class="pip"></i><i class="pip"></i></div></div><div>Latency<strong id="lat">42 ms</strong></div></div>
 <div class="win-log"><span>[12:01]</span> Logged in. Bot online.<br><span>[12:14]</span> &lt;Steve&gt; hello<br><span>[12:14]</span> Bot: Hello! Try !help</div></div></div></div></section>
 
 <section class="sec"><h2 data-reveal>See what it says.</h2><div class="term" id="term" data-reveal></div></section>
@@ -105,11 +108,18 @@ function tick(){
   flags.forEach((f,i)=>f.classList.toggle('lit',p>[.22,.45,.7][i]));
   const a=Math.min(3,Math.floor(p*4));caps.forEach((c,i)=>c.classList.toggle('on',i===a));
   const q=clamp((innerHeight-$('#pv').getBoundingClientRect().top)/(innerHeight*.85));$('#win').style.transform=`perspective(1400px) rotateX(${(1-q)*42}deg) scale(${.84+.16*q})`;
+  const sy=scrollY,hc=$('.hero>div');if(sy<innerHeight*1.2){hc.style.opacity=Math.max(0,1-sy/(innerHeight*.9));$('.title').style.transform=`translate3d(0,${sy*.22}px,0)`;$('#pm').style.transform=`translate3d(0,${sy*.12}px,0)`;$('.hero p').style.transform=`translate3d(0,${sy*.32}px,0)`}
   let h=prog($('#hz'));track.style.transform=`translateX(${-h*(track.scrollWidth-innerWidth)}px)`;
 }
 addEventListener('scroll',tick,{passive:true});addEventListener('resize',tick);tick();
-document.fonts.ready.then(()=>requestAnimationFrame(()=>document.body.classList.add('go')));setTimeout(()=>document.body.classList.add('go'),1500);
-const m=$('#mascot');addEventListener('pointermove',e=>{m.style.transform=`perspective(600px) rotateY(${(e.clientX/innerWidth-.5)*22}deg) rotateX(${(.5-e.clientY/innerHeight)*18}deg)`},{passive:true});
+(()=>{const b=$('#boot'),go=()=>document.body.classList.add('go'),ready=()=>document.fonts.ready.then(()=>requestAnimationFrame(go));let seen=0;try{seen=sessionStorage.getItem('ab')}catch{}
+if(seen||matchMedia('(prefers-reduced-motion:reduce)').matches){b.remove();ready();setTimeout(go,1500);return}
+const L=['> booting aurora...','> loading night sky... ok','> waking the bot... ok','> ready.'],p=b.querySelector('p'),bar=b.querySelector('i');
+L.forEach((t,i)=>setTimeout(()=>{p.innerHTML+=t+'<br>';bar.style.width=(i+1)*25+'%'},i*380));
+setTimeout(()=>{b.classList.add('out');ready();try{sessionStorage.setItem('ab','1')}catch{};setTimeout(()=>b.remove(),600);setTimeout(go,1100)},L.length*380+250)})();
+const eyes=[...document.querySelectorAll('.eye')];addEventListener('pointermove',e=>{const dx=(e.clientX/innerWidth-.5)*9,dy=(e.clientY/innerHeight-.5)*7;eyes.forEach(y=>y.style.transform=`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px))`)},{passive:true});
+new IntersectionObserver((es,o)=>{if(!es[0].isIntersecting)return;o.disconnect();const t0=performance.now(),el=$('#lat');(function s(n){const k=Math.min(1,(n-t0)/900);el.textContent=Math.round(42*(1-Math.pow(1-k,3)))+' ms';k<1&&requestAnimationFrame(s)})(t0)},{threshold:.5}).observe($('#win'));
+const m=$('#mw');addEventListener('pointermove',e=>{m.style.transform=`perspective(600px) rotateY(${(e.clientX/innerWidth-.5)*22}deg) rotateX(${(.5-e.clientY/innerHeight)*18}deg)`},{passive:true});
 const L=[['m','[12:01:04] Connecting to your server...'],['s','[12:01:06] Logged in. /login accepted.'],['c','[12:01:07] Bot online. AFK movement started.'],['s','[12:14:40] <Steve> hello'],['c','[12:14:41] Bot: Hello! Try !help'],['w','[12:30:12] Kicked: connection reset'],['c','[12:30:20] Reconnected. Back online.']];
 new IntersectionObserver((es,o)=>{if(!es[0].isIntersecting)return;o.disconnect();const t=$('#term');L.forEach(([c,x],i)=>setTimeout(()=>{t.insertAdjacentHTML('beforeend',`<div class="${c}">${x}</div>`)},i*700))},{threshold:.5}).observe($('#term'));
 
