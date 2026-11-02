@@ -7,7 +7,7 @@
     <link rel="icon" type="image/png" href="/aurora-bot.png">
     <link rel="stylesheet" href="/styles.css">
   </head>
-  <body>
+  <body data-loading>
 <div class="app">
 <aside class="side">
   <div class="brand"><img class="brand-mark" src="/aurora-bot.png" alt="Aurora Bot"><span>Aurora Bot</span></div>
@@ -50,6 +50,10 @@
       <div class="spec"><span>Latency</span><strong id="ping">--</strong><small>ms</small></div>
     </div>
   </div>
+  <div class="dash-row">
+    <div class="panel"><div class="telemetry-heading"><h3>Uptime &amp; latency</h3><strong id="uptime">Offline</strong></div><canvas id="ping-graph"></canvas></div>
+    <div class="panel"><div class="telemetry-heading"><h3>Bot map</h3><strong id="map-pos">--</strong></div><canvas id="bot-map"></canvas></div>
+  </div>
   <div class="panel console-panel">
     <div class="panel-heading"><h2>Live console <button class="info-button" data-tooltip="Server messages, bot events, and commands sent from this panel." aria-label="About live console">i</button></h2><span class="event-count" id="event-count">0 events</span></div>
     <div class="console" id="console" aria-live="polite"></div>
@@ -88,6 +92,15 @@
     <button class="button button-save" type="submit">Save settings <span>✓</span></button>
     <p class="form-message" id="form-message"></p>
   </form>
+  <div class="panel" style="margin-top:18px">
+    <div class="telemetry-heading"><h3>Appearance</h3></div>
+    <div class="themes">
+      <button type="button" class="theme-btn" data-theme-btn="aurora"><i style="background:linear-gradient(135deg,#7f4dff,#5dffb4)"></i>Aurora</button>
+      <button type="button" class="theme-btn" data-theme-btn="nether"><i style="background:linear-gradient(135deg,#d9381e,#ffc857)"></i>Nether</button>
+      <button type="button" class="theme-btn" data-theme-btn="end"><i style="background:linear-gradient(135deg,#9b5cf0,#8fe3ff)"></i>End</button>
+    </div>
+    <label class="toggle-row" for="sound-toggle"><span>Sound effects</span><input id="sound-toggle" type="checkbox"></label>
+  </div>
   <div class="panel runtime-summary" style="margin-top:18px">
     <div class="telemetry-heading"><h3>Runtime profile</h3></div>
     <div class="runtime-list"><div><span>Authentication</span><strong>Automatic login</strong></div><div><span>AFK behavior</span><strong>Pathfinder movement</strong></div><div><span>Farming automation</span><strong class="planned">Planned</strong></div></div>
