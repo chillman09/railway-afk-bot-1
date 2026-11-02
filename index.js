@@ -81,7 +81,10 @@ app.post('/api/auth/login', (req, res) => {
   req.session.regenerate(err => {
     if (err) return res.status(500).json({ error: 'Login failed, please try again' });
     req.session.user = authedUser;
-    res.json({ user: authedUser });
+    req.session.save(saveErr => {
+      if (saveErr) return res.status(500).json({ error: 'Login failed, please try again' });
+      res.json({ user: authedUser });
+    });
   });
 });
 
@@ -134,6 +137,8 @@ app.get('/admin', requireAuth, requireAdmin, (req, res) => {
 });
 
 app.get('/', (req, res) => {
+  // The same URL shows different pages depending on login, so never cache it.
+  res.set({ 'Cache-Control': 'no-store, must-revalidate', Vary: 'Cookie' });
   const page = req.session?.user ? 'index.html' : 'landing.html';
   res.sendFile(path.join(__dirname, 'public', page));
 });
@@ -308,6 +313,12 @@ function shutdown() {
 }
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
+
+// 404 handler (must come after every route)
+app.use((req, res) => {
+  if (req.path.startsWith('/api')) return res.status(404).json({ error: 'Not found' });
+  res.status(404).sendFile(path.join(__dirname, 'public', '404.html'));
+});
 
 const panelPort = Number(process.env.PORT || process.env.PANEL_PORT || 3000);
 setInterval(() => { for (const bot of botManager.all()) bot.updateTelemetry(); }, 1000);
