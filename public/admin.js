@@ -5,33 +5,40 @@ async function loadUsers() {
   renderUsers(users);
 }
 
-function renderUsers(users) {
-  document.querySelector('#user-count').textContent = `${users.length} user${users.length === 1 ? '' : 's'}`;
+let allUsers = [];
+const esc = v => String(v).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
+function renderUsers(users) { allUsers = users; paintUsers(); }
+function paintUsers() {
+  const q = (document.querySelector('#user-search')?.value || '').trim().toLowerCase();
+  const me = document.querySelector('#user-chip')?.textContent.trim();
+  const shown = allUsers.filter(u => u.username.toLowerCase().includes(q));
+  document.querySelector('#user-count').textContent = `${shown.length} user${shown.length === 1 ? '' : 's'}`;
   const list = document.querySelector('#user-list');
-  if (!users.length) {
-    list.innerHTML = '<span class="empty-route">No users yet. Create the first one →</span>';
-    return;
-  }
-  list.innerHTML = users.map(user => `
-    <div class="route-point user-row">
-      <div>
-        <strong>${user.username.replaceAll('<', '&lt;')}</strong>
-        <span>${user.role} · added ${new Date(user.createdAt).toLocaleDateString()}</span>
-      </div>
-      <button class="point-go delete-user" data-username="${user.username}">Remove</button>
-    </div>
-  `).join('');
-
+  if (!shown.length) { list.innerHTML = `<span class="empty-route">${allUsers.length ? 'No users match your search.' : 'No users yet. Create the first one →'}</span>`; return; }
+  list.innerHTML = shown.map(user => {
+    const hue = [...user.username].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7);
+    const isNew = Date.now() - new Date(user.createdAt) < 7 * 864e5;
+    return `<div class="route-point user-row">
+      <div class="urow"><span class="avatar" style="background:hsl(${hue} 75% 62%)">${esc(user.username[0] || '?').toUpperCase()}</span>
+        <div><strong>${esc(user.username)}</strong><span>added ${new Date(user.createdAt).toLocaleDateString()}</span></div></div>
+      <div class="badges">
+        <span class="badge ${user.role === 'admin' ? 'admin' : ''}">${esc(user.role)}</span>
+        ${isNew ? '<span class="badge new">new</span>' : ''}${user.username === me ? '<span class="badge you">you</span>' : ''}
+        <button class="point-go delete-user" data-username="${esc(user.username)}">Remove</button>
+      </div></div>`;
+  }).join('');
   list.querySelectorAll('.delete-user').forEach(button => {
     button.addEventListener('click', async () => {
       const username = button.dataset.username;
       const confirmed = await window.confirmAction(`Remove "${username}"? Their bot will be stopped and they'll lose access immediately.`);
       if (!confirmed) return;
       await fetch(`/api/admin/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
+      window.toast?.(`Removed ${username}`, 'warn');
       loadUsers();
     });
   });
 }
+document.querySelector('#user-search').addEventListener('input', paintUsers);
 
 document.querySelector('#create-user-form').addEventListener('submit', async event => {
   event.preventDefault();
