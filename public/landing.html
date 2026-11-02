@@ -115,4 +115,13 @@ new IntersectionObserver((es,o)=>{if(!es[0].isIntersecting)return;o.disconnect()
 
 const G='#$%&*+<>?/',scr=el=>{const t=el.textContent;let n=0;const iv=setInterval(()=>{el.textContent=[...t].map((c,i)=>i<n||c===' '?c:G[Math.random()*G.length|0]).join('');if((n+=.7)>t.length){el.textContent=t;clearInterval(iv)}},35)};
 document.querySelectorAll('.sec>h2,.pv h2').forEach(h=>new IntersectionObserver((es,o)=>{if(es[0].isIntersecting){o.disconnect();matchMedia('(prefers-reduced-motion:reduce)').matches||scr(h)}},{threshold:.6}).observe(h));
+
+/* inertia scroll: wheel input eases toward a target instead of jumping */
+if(!matchMedia('(prefers-reduced-motion:reduce)').matches&&matchMedia('(hover:hover)').matches){
+  document.documentElement.style.scrollBehavior='auto';
+  let target=scrollY,cur=scrollY,raf=0;const max=()=>document.body.scrollHeight-innerHeight;
+  const loop=()=>{cur+=(target-cur)*.085;if(Math.abs(target-cur)<.4){cur=target;raf=0}else raf=requestAnimationFrame(loop);scrollTo(0,cur)};
+  addEventListener('wheel',e=>{if(e.ctrlKey||e.target.closest('textarea,iframe'))return;e.preventDefault();if(!raf)cur=target=scrollY;target=Math.max(0,Math.min(max(),target+e.deltaY*(e.deltaMode===1?32:1)));if(!raf)raf=requestAnimationFrame(loop)},{passive:false});
+  addEventListener('scroll',()=>{if(!raf)cur=target=scrollY},{passive:true});
+}
 </script></body></html>
