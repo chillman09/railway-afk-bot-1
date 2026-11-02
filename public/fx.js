@@ -12,13 +12,22 @@
     cv.width = W * k; cv.height = H * k;
     grads = rib.map(([hue]) => { const gr = g.createLinearGradient(0, -H * .28, 0, 40); gr.addColorStop(0, `hsla(${hue},95%,65%,0)`); gr.addColorStop(.75, `hsla(${hue},95%,62%,.12)`); gr.addColorStop(1, `hsla(${hue},95%,70%,0)`); return gr; });
   }
-  addEventListener('resize', size); size();
+  addEventListener('resize', size);
+  const TH = { aurora: ['#090719', [262, 158, 285]], nether: ['#170606', [8, 32, 350]], end: ['#0a0912', [285, 190, 310]] };
+  let bg = '#090719';
+  window.setTheme = n => {
+    if (!TH[n]) n = 'aurora'; root.dataset.theme = n; try { localStorage.setItem('aurora-theme', n); } catch {}
+    bg = TH[n][0]; TH[n][1].forEach((h, i) => rib[i][0] = h); size();
+    document.querySelectorAll('[data-theme-btn]').forEach(b => b.classList.toggle('active', b.dataset.themeBtn === n));
+  };
+  let saved = 'aurora'; try { saved = localStorage.getItem('aurora-theme') || 'aurora'; } catch {}
+  setTheme(saved);
   function draw(now) {
     if (still || document.hidden) return;
     requestAnimationFrame(draw);
     if (now - last < 33) return; last = now; t += .01;
     g.setTransform(k, 0, 0, k, 0, 0); g.globalCompositeOperation = 'source-over';
-    g.fillStyle = '#090719'; g.fillRect(0, 0, W, H);
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
     g.fillStyle = '#fff';
     stars.forEach(s => { g.globalAlpha = .35 + .65 * Math.abs(Math.sin(t * 2 + s.p)); g.fillRect(((s.x * W) - (mx - .5) * 30 * s.s) | 0, (s.y * H) | 0, s.s, s.s); });
     g.globalAlpha = 1; g.globalCompositeOperation = 'lighter';
@@ -60,6 +69,7 @@
   });
   // Ctrl/Cmd+K command palette (dashboard only)
   const cmds = [...document.querySelectorAll('[data-tab]')].map(b => ['Go to ' + b.querySelector('span').textContent, () => b.click()])
+    .concat(['aurora', 'nether', 'end'].map(n => ['Theme: ' + n, () => setTheme(n)]))
     .concat([...document.querySelectorAll('[data-action]')].map(b => [b.textContent.replace(/[→↻×]/g, '').trim() + ' bot', () => b.click()]));
   if (cmds.length) {
     const pal = document.createElement('div'); pal.className = 'pal'; pal.hidden = true;
@@ -82,4 +92,25 @@
     ul.addEventListener('click', e => e.target.dataset.i && run(+e.target.dataset.i));
     pal.addEventListener('pointerdown', e => e.target === pal && close());
   }
+  // toasts + sound (shared helpers)
+  const tw = document.createElement('div'); tw.className = 'toasts'; document.body.appendChild(tw);
+  window.toast = (msg, kind = 'info') => {
+    const t = document.createElement('div'); t.className = 'toast ' + kind; t.textContent = msg; tw.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('in')); setTimeout(() => { t.classList.remove('in'); setTimeout(() => t.remove(), 300); }, 4200);
+  };
+  const soundOn = () => { try { return localStorage.getItem('aurora-sound') === '1'; } catch { return false; } };
+  let ac;
+  window.sfx = k => {
+    if (!soundOn()) return;
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    let t = ac.currentTime;
+    ({ click: [[520, .05]], join: [[392, .09], [523, .09], [659, .15]], warn: [[196, .16], [147, .22]], error: [[160, .12], [120, .2]] }[k] || []).forEach(([fr, d]) => {
+      const o = ac.createOscillator(), v = ac.createGain(); o.type = 'square'; o.frequency.value = fr;
+      v.gain.setValueAtTime(.05, t); v.gain.exponentialRampToValueAtTime(.001, t + d); o.connect(v).connect(ac.destination); o.start(t); o.stop(t + d); t += d;
+    });
+  };
+  addEventListener('pointerdown', e => e.target.closest('.button,.tab,.command-form button') && sfx('click'));
+  document.addEventListener('click', e => { const b = e.target.closest('[data-theme-btn]'); if (b) setTheme(b.dataset.themeBtn); });
+  const st = document.querySelector('#sound-toggle');
+  if (st) { st.checked = soundOn(); st.addEventListener('change', () => { try { localStorage.setItem('aurora-sound', st.checked ? '1' : '0'); } catch {} sfx('join'); }); }
 })();
