@@ -203,3 +203,69 @@ function showTab(name) {
 }
 tabBtns.forEach(t => t.addEventListener('click', () => showTab(t.dataset.tab)));
 showTab(location.hash.slice(1) || 'console');
+
+// ---- extras: toasts, uptime graph, bot map ----
+let prevStatus = null, onlineSince = null, routePts = [];
+const pings = [], trail = [], lastSaid = {};
+function say(msg, kind) { const n = Date.now(); if (lastSaid[msg] > n - 2500) return; lastSaid[msg] = n; window.toast?.(msg, kind); }
+socket.on('state', s => {
+  document.body.removeAttribute('data-loading');
+  if (s.status !== prevStatus) {
+    if (prevStatus !== null) {
+      if (s.status === 'online') { say('Bot is online', 'ok'); window.sfx?.('join'); }
+      else if (s.status === 'connecting') say('Connecting to the server...', 'warn');
+      else if (prevStatus === 'online') { say('Bot went offline', 'error'); window.sfx?.('warn'); }
+    }
+    prevStatus = s.status;
+  }
+  onlineSince = s.status === 'online' ? (onlineSince || Date.now()) : null;
+  if (s.status === 'online' && Number.isFinite(Number(s.ping)) && s.ping !== null) { pings.push(Number(s.ping)); if (pings.length > 60) pings.shift(); }
+  const m = String(s.position || '').match(/(-?\d+),\s*(-?\d+),\s*(-?\d+)/);
+  if (m) { const p = [Number(m[1]), Number(m[3])], l = trail[trail.length - 1]; if (!l || l[0] !== p[0] || l[1] !== p[1]) { trail.push(p); if (trail.length > 80) trail.shift(); } }
+  else if (s.status !== 'online') trail.length = 0;
+});
+socket.on('route', r => { routePts = r.points || []; });
+socket.on('log', e => { if (e.level === 'error') say(e.message.slice(0, 90), 'error'); else if (e.level === 'warning') say(e.message.slice(0, 90), 'warn'); });
+
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function fit(cv) {
+  const r = cv.getBoundingClientRect(), d = Math.min(devicePixelRatio || 1, 2);
+  if (cv.width !== Math.round(r.width * d)) { cv.width = Math.round(r.width * d); cv.height = Math.round(r.height * d); }
+  const c = cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0); return [c, r.width, r.height];
+}
+function drawGraph() {
+  const cv = document.querySelector('#ping-graph'); if (!cv || !cv.offsetParent) return;
+  const [c, w, h] = fit(cv); c.clearRect(0, 0, w, h);
+  c.strokeStyle = cssVar('--line'); c.lineWidth = 1;
+  for (let i = 1; i < 4; i++) { c.beginPath(); c.moveTo(0, h * i / 4); c.lineTo(w, h * i / 4); c.stroke(); }
+  if (pings.length < 2) { c.fillStyle = cssVar('--text-faint'); c.font = '13px Manrope'; c.textAlign = 'center'; c.fillText('Latency appears when the bot is online', w / 2, h / 2); return; }
+  const max = Math.max(100, ...pings) * 1.15, st = w / 59, x0 = w - (pings.length - 1) * st;
+  c.beginPath(); pings.forEach((v, i) => { const x = x0 + i * st, y = h - (v / max) * h * .9 - 4; i ? c.lineTo(x, y) : c.moveTo(x, y); });
+  c.strokeStyle = cssVar('--aur'); c.lineWidth = 2; c.stroke();
+  c.lineTo(w, h); c.lineTo(x0, h); c.fillStyle = 'rgba(93,255,180,.12)'; c.fill();
+}
+function drawMap() {
+  const cv = document.querySelector('#bot-map'); if (!cv || !cv.offsetParent) return;
+  const [c, w, h] = fit(cv); c.clearRect(0, 0, w, h);
+  const pts = [...trail, ...routePts.map(p => [Math.round(p.x), Math.round(p.z)])];
+  if (!pts.length) { c.fillStyle = cssVar('--text-faint'); c.font = '13px Manrope'; c.textAlign = 'center'; c.fillText('The map appears when the bot is online', w / 2, h / 2); return; }
+  const xs = pts.map(p => p[0]), zs = pts.map(p => p[1]);
+  const span = Math.max(24, Math.max(...xs) - Math.min(...xs), Math.max(...zs) - Math.min(...zs));
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cz = (Math.max(...zs) + Math.min(...zs)) / 2, k = Math.min(w, h) / (span * 1.35);
+  const X = x => w / 2 + (x - cx) * k, Z = z => h / 2 + (z - cz) * k, step = 8 * k, off = v => ((v % step) + step) % step;
+  c.strokeStyle = cssVar('--line'); c.lineWidth = 1;
+  for (let x = off(w / 2 - cx * k); x < w; x += step) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, h); c.stroke(); }
+  for (let y = off(h / 2 - cz * k); y < h; y += step) { c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke(); }
+  if (routePts.length > 1) { c.setLineDash([5, 5]); c.strokeStyle = cssVar('--aur'); c.beginPath(); routePts.forEach((p, i) => i ? c.lineTo(X(p.x), Z(p.z)) : c.moveTo(X(p.x), Z(p.z))); c.stroke(); c.setLineDash([]); }
+  routePts.forEach(p => { c.fillStyle = cssVar('--aur'); c.fillRect(X(p.x) - 4, Z(p.z) - 4, 8, 8); c.fillStyle = cssVar('--muted'); c.font = '11px Manrope'; c.textAlign = 'left'; c.fillText(p.label, X(p.x) + 8, Z(p.z) + 4); });
+  if (trail.length > 1) { c.strokeStyle = cssVar('--accent'); c.lineWidth = 2; c.beginPath(); trail.forEach((p, i) => i ? c.lineTo(X(p[0]), Z(p[1])) : c.moveTo(X(p[0]), Z(p[1]))); c.stroke(); }
+  const b = trail[trail.length - 1];
+  if (b) { const pulse = 9 + Math.sin(Date.now() / 250) * 2; c.fillStyle = cssVar('--accent'); c.shadowColor = cssVar('--accent'); c.shadowBlur = 14; c.fillRect(X(b[0]) - pulse / 2, Z(b[1]) - pulse / 2, pulse, pulse); c.shadowBlur = 0; }
+  document.querySelector('#map-pos').textContent = b ? `${b[0]}, ${b[1]}` : '--';
+}
+setInterval(() => {
+  const up = document.querySelector('#uptime');
+  if (up) { const s = onlineSince ? Math.floor((Date.now() - onlineSince) / 1000) : -1; up.textContent = s < 0 ? 'Offline' : `${Math.floor(s / 3600)}h ${Math.floor(s % 3600 / 60)}m ${s % 60}s`; }
+  drawGraph(); drawMap();
+}, 1000);
+tabBtns.forEach(t => t.addEventListener('click', () => setTimeout(() => { drawGraph(); drawMap(); }, 80)));
