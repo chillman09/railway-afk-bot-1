@@ -22,6 +22,8 @@ document.querySelector('#login-form').addEventListener('submit', async event => 
     if (!response.ok) {
       message.textContent = data.error || 'Sign in failed.';
       message.className = 'form-message error';
+      const card = document.querySelector('.login-card'); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+      window.sfx?.('error');
       return;
     }
     window.location.href = '/';
