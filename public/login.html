@@ -1,30 +1,37 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aurora Bot / Sign in</title>
-    <link rel="icon" type="image/png" href="/aurora-bot.png">
-    <link rel="stylesheet" href="/styles.css">
-  </head>
-  <body class="login-body">
-    <main class="login-shell">
-      <div class="login-card">
-        <div class="login-brand"><img class="brand-mark" src="/aurora-bot.png" alt="Aurora Bot"><span>Aurora Bot</span></div>
-        <h1>Sign in</h1>
-        <p class="lede">Access is by invitation only. Ask your admin for an account.</p>
+document.querySelector('#login-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const message = document.querySelector('#login-message');
+  const button = event.target.querySelector('button[type="submit"]');
+  const payload = {
+    username: document.querySelector('#login-username').value.trim(),
+    password: document.querySelector('#login-password').value
+  };
 
-        <form id="login-form" class="login-form">
-          <label>Username<input id="login-username" autocomplete="username" required></label>
-          <label>Password<input id="login-password" type="password" autocomplete="current-password" required></label>
-          <button class="button button-primary button-save" type="submit">Sign in <span>→</span></button>
-          <p class="form-message" id="login-message"></p>
-        </form>
-      </div>
-      <footer class="footer login-footer"><span>Aurora Bot</span><span>Access by admin invitation only</span></footer>
-    </main>
+  button.disabled = true;
+  button.classList.add('is-loading');
+  message.textContent = '';
+  message.className = 'form-message';
 
-    <script src="/login.js"></script>
-      <script src="/fx.js"></script>
-  </body>
-</html>
+  try {
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      message.textContent = data.error || 'Sign in failed.';
+      message.className = 'form-message error';
+      const card = document.querySelector('.login-card'); card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+      window.sfx?.('error');
+      return;
+    }
+    window.location.replace('/');
+  } catch {
+    message.textContent = 'Could not reach the server. Try again.';
+    message.className = 'form-message error';
+  } finally {
+    button.disabled = false;
+    button.classList.remove('is-loading');
+  }
+});
