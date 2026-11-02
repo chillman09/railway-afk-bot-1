@@ -16,8 +16,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const logoutButton = document.querySelector('#logout-button');
   if (logoutButton) {
     logoutButton.addEventListener('click', async () => {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.href = '/login';
+      await fetch('/api/auth/logout', { method: 'POST', cache: 'no-store' });
+      window.location.replace('/');
     });
   }
 });
