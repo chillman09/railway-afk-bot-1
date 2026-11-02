@@ -26,7 +26,7 @@ document.querySelector('#login-form').addEventListener('submit', async event => 
       window.sfx?.('error');
       return;
     }
-    window.location.href = '/';
+    window.location.replace('/');
   } catch {
     message.textContent = 'Could not reach the server. Try again.';
     message.className = 'form-message error';
