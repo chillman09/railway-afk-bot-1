@@ -42,4 +42,44 @@
     b.addEventListener('pointermove', e => { const r = b.getBoundingClientRect(); b.style.transform = `translate(${(e.clientX - r.left - r.width / 2) * .25}px,${(e.clientY - r.top - r.height / 2) * .35}px)`; });
     b.addEventListener('pointerleave', () => b.style.transform = '');
   });
+  // 3D tilt on cards (hover devices only)
+  if (matchMedia('(hover:hover)').matches && !still) document.querySelectorAll('.card,.metric,.steps .panel').forEach(el => {
+    el.addEventListener('pointerenter', () => el.style.transition = 'transform .12s');
+    el.addEventListener('pointermove', e => { const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5; el.style.transform = `perspective(700px) rotateY(${x * 12}deg) rotateX(${-y * 12}deg) translateZ(6px)`; });
+    el.addEventListener('pointerleave', () => { el.style.transition = ''; el.style.transform = ''; });
+  });
+  // pixel burst on button press
+  addEventListener('pointerdown', e => {
+    if (still || !e.target.closest('.button,.tab,.command-form button')) return;
+    for (let i = 0; i < 9; i++) {
+      const p = document.createElement('i'); p.className = 'px'; p.style.left = e.clientX + 'px'; p.style.top = e.clientY + 'px';
+      p.style.background = ['#5dffb4', '#b690ff', '#fff'][i % 3]; document.body.appendChild(p);
+      const a = Math.random() * 6.28, d = 30 + Math.random() * 40;
+      p.animate([{ transform: 'translate(0,0)', opacity: 1 }, { transform: `translate(${Math.cos(a) * d}px,${Math.sin(a) * d}px)`, opacity: 0 }], { duration: 520, easing: 'ease-out' }).onfinish = () => p.remove();
+    }
+  });
+  // Ctrl/Cmd+K command palette (dashboard only)
+  const cmds = [...document.querySelectorAll('[data-tab]')].map(b => ['Go to ' + b.querySelector('span').textContent, () => b.click()])
+    .concat([...document.querySelectorAll('[data-action]')].map(b => [b.textContent.replace(/[→↻×]/g, '').trim() + ' bot', () => b.click()]));
+  if (cmds.length) {
+    const pal = document.createElement('div'); pal.className = 'pal'; pal.hidden = true;
+    pal.innerHTML = '<div class="pal-box"><input placeholder="Type a command..." aria-label="Command palette"><ul></ul><small>↑↓ to move · Enter to run · Esc to close</small></div>';
+    document.body.appendChild(pal);
+    const inp = pal.querySelector('input'), ul = pal.querySelector('ul'); let list = cmds, at = 0;
+    const draw = () => { ul.innerHTML = list.map((c, i) => `<li class="${i === at ? 'on' : ''}" data-i="${i}">${c[0]}</li>`).join('') || '<li>No match</li>'; };
+    const open = () => { pal.hidden = false; inp.value = ''; list = cmds; at = 0; draw(); inp.focus(); }, close = () => pal.hidden = true;
+    const run = i => { if (list[i]) { close(); list[i][1](); } };
+    addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); pal.hidden ? open() : close(); }
+      else if (!pal.hidden) {
+        if (e.key === 'Escape') close();
+        else if (e.key === 'ArrowDown') { at = (at + 1) % list.length; draw(); e.preventDefault(); }
+        else if (e.key === 'ArrowUp') { at = (at - 1 + list.length) % list.length; draw(); e.preventDefault(); }
+        else if (e.key === 'Enter') run(at);
+      }
+    });
+    inp.addEventListener('input', () => { list = cmds.filter(c => c[0].toLowerCase().includes(inp.value.toLowerCase())); at = 0; draw(); });
+    ul.addEventListener('click', e => e.target.dataset.i && run(+e.target.dataset.i));
+    pal.addEventListener('pointerdown', e => e.target === pal && close());
+  }
 })();
