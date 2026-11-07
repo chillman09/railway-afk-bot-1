@@ -13,6 +13,8 @@ const { requireAuth, requireAdmin } = require('./lib/auth');
 const db = require('./lib/db');
 const userStore = require('./lib/userStore');
 const servers = require('./lib/servers');
+const nodes = require('./lib/nodes');
+const botApi = require('./lib/botApi');
 const botManager = require('./lib/botManager');
 const { isRateLimited, recordAttempt, clearAttempts } = require('./lib/rateLimiter');
 
@@ -37,6 +39,7 @@ if (!SESSION_SECRET) {
 const app = express();
 const httpServer = http.createServer(app);
 const io = new Server(httpServer);
+nodes.attach(io);
 
 app.set('trust proxy', 1); // required for secure cookies behind Railway/most PaaS reverse proxies
 app.use(express.json());
@@ -128,7 +131,7 @@ app.post('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
 
 app.delete('/api/admin/users/:username', requireAuth, requireAdmin, async (req, res) => {
   const { username } = req.params;
-  for (const id of await servers.deleteForOwner(username)) botManager.remove(id);
+  for (const s of await servers.deleteForOwner(username)) await removeBot(s);
   const removed = await userStore.deleteUser(username);
   res.json({ removed });
 });
@@ -192,6 +195,12 @@ app.post('/api/redeem', requireAuth, async (req, res) => {
 
 const fail = (res, err, code = 400) => res.status(code).json({ error: err.message });
 app.get('/api/admin/nodes', requireAuth, requireAdmin, async (req, res) => res.json({ nodes: await servers.listNodes() }));
+app.post('/api/admin/nodes', requireAuth, requireAdmin, async (req, res) => {
+  try { res.json(await nodes.createNode(req.body && req.body.name, req.body && req.body.maxBots)); } catch (err) { fail(res, err); }
+});
+app.delete('/api/admin/nodes/:id', requireAuth, requireAdmin, async (req, res) => {
+  try { await nodes.deleteNode(req.params.id); res.json({ ok: true }); } catch (err) { fail(res, err); }
+});
 app.get('/api/admin/servers', requireAuth, requireAdmin, async (req, res) => {
   const nodeNames = Object.fromEntries((await servers.listNodes()).map(n => [n.id, n.name]));
   res.json({ servers: (await servers.listAll()).map(s => ({ ...view(s, nodeNames[s.nodeId]), owner: s.owner })) });
@@ -202,7 +211,7 @@ app.post('/api/admin/servers', requireAuth, requireAdmin, async (req, res) => {
 app.post('/api/admin/servers/:id/suspend', requireAuth, requireAdmin, async (req, res) => {
   try {
     const suspended = await servers.toggleSuspend(req.params.id);
-    if (suspended) botManager.get(req.params.id)?.stop();
+    if (suspended) { const s = await servers.getServer(req.params.id); if (s) runOn(s, 'action', 'stop', {}).catch(() => {}); }
     res.json({ suspended });
   } catch (err) { fail(res, err, 404); }
 });
@@ -210,7 +219,8 @@ app.post('/api/admin/servers/:id/renew', requireAuth, requireAdmin, async (req, 
   try { await servers.renew(req.params.id, req.body && req.body.days); res.json({ ok: true }); } catch (err) { fail(res, err); }
 });
 app.delete('/api/admin/servers/:id', requireAuth, requireAdmin, async (req, res) => {
-  botManager.remove(req.params.id);
+  const s = await servers.getServer(req.params.id);
+  if (s) await removeBot(s);
   res.json({ removed: await servers.deleteServer(req.params.id) });
 });
 app.get('/api/admin/codes', requireAuth, requireAdmin, async (req, res) => res.json({ codes: await servers.listCodes() }));
@@ -265,105 +275,50 @@ app.get('/', async (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------------------------------------------------------------------------
-// Bot control API — every route below is scoped to req.session.user.username,
-// so each logged-in user only ever sees and controls their own bot instance.
+// Bot control API — each request acts on the bot (server) this session has
+// selected, wherever it runs: on this panel's own node, or on a remote node.
 // ---------------------------------------------------------------------------
-app.get('/api/state', requireAuth, async (req, res) => {
-  const bot = await botFor(req, res); if (!bot) return;
-  res.json({ state: bot.state, logs: bot.logs, supportedVersions: bot.state.supportedVersions });
-});
+function runOn(s, kind, action, body) {
+  if (s.nodeId === 'local') return Promise.resolve(botApi.handle(botManager.getOrCreate(s._id, io), kind, action, body));
+  return nodes.rpc(s.nodeId, { id: s._id, config: db.getBot(s._id), kind, action, body });
+}
+async function removeBot(s) {
+  if (s.nodeId === 'local') botManager.remove(s._id);
+  else await nodes.rpc(s.nodeId, { id: s._id, kind: 'delete' }).catch(() => {});
+}
+async function selectedServer(req) {
+  const s = req.session.serverId && await servers.getServer(req.session.serverId);
+  return s && s.ownerLower === req.session.user.username.toLowerCase() ? s : null;
+}
+async function dispatchTo(req, res, kind, action, body) {
+  const s = await selectedServer(req);
+  if (!s) return res.status(409).json({ error: 'No bot selected', code: 'NO_SERVER' });
+  const r = await runOn(s, kind, action, body);
+  res.status(r.status).json(r.json);
+}
 
-app.post('/api/chat', requireAuth, async (req, res) => {
-  const bot = await botFor(req, res); if (!bot) return;
-  const message = typeof req.body.message === 'string' ? req.body.message.trim() : '';
-  if (!message) return res.status(400).json({ error: 'Message is required' });
-  res.json({ sent: bot.sendChat(message) });
-});
-
-app.post('/api/config', requireAuth, async (req, res) => {
-  const bot = await botFor(req, res); if (!bot) return;
-  const result = bot.updateConfig(req.body || {});
-  if (!result.ok) return res.status(400).json({ error: result.error });
-  res.json({ state: bot.state });
-});
-
-app.post('/api/route/:action', requireAuth, async (req, res) => {
-  const bot = await botFor(req, res); if (!bot) return;
-  const { action } = req.params;
-
-  if (action === 'start') {
-    bot.routeRecording = true;
-    bot.addLog('Route recording started', 'system');
-  } else if (action === 'stop') {
-    bot.routeRecording = false;
-    bot.persist();
-    bot.addLog(`Route recording stopped with ${bot.route.length} checkpoints`, 'system');
-  } else if (action === 'checkpoint') {
-    if (!bot.routeRecording) return res.status(400).json({ error: 'Start route recording first' });
-    if (!bot.addCheckpoint(req.body.label)) return res.status(400).json({ error: 'Bot is not connected' });
-  } else if (action === 'clear') {
-    bot.route = [];
-    bot.persist();
-    bot.addLog('Route checkpoints cleared', 'warning');
-  } else if (action === 'goto') {
-    const point = bot.route[Number(req.body.index)];
-    if (!point) return res.status(404).json({ error: 'Checkpoint not found' });
-    if (!bot.bot?.entity) return res.status(400).json({ error: 'Bot is not connected' });
-    bot.stopMovement();
-    bot.navigationMode = 'route';
-    const goal = new goals.GoalNear(Math.floor(point.x), Math.floor(point.y), Math.floor(point.z), 1);
-    bot.bot.pathfinder.setMovements(new Movements(bot.bot));
-    const navigation = bot.bot.pathfinder.goto(goal);
-    const timeout = new Promise((resolve, reject) => setTimeout(() => reject(new Error('timed out after 60 seconds')), 60000));
-    Promise.race([navigation, timeout])
-      .then(() => {
-        bot.navigationMode = 'idle';
-        bot.addLog(`Reached route checkpoint: ${point.label}`, 'success');
-      })
-      .catch(error => {
-        bot.navigationMode = 'idle';
-        bot.bot?.pathfinder?.setGoal(null);
-        bot.addLog(`Could not reach ${point.label}: ${error.message}`, 'error');
-      });
-    bot.addLog(`Walking to checkpoint: ${point.label}`, 'system');
-  } else {
-    return res.status(404).json({ error: 'Unknown route action' });
-  }
-  bot.emitRoute();
-  res.json({ recording: bot.routeRecording, points: bot.route });
-});
+app.get('/api/state', requireAuth, (req, res) => dispatchTo(req, res, 'state'));
+app.post('/api/chat', requireAuth, (req, res) => dispatchTo(req, res, 'chat', null, req.body));
+app.post('/api/config', requireAuth, (req, res) => dispatchTo(req, res, 'config', null, req.body));
+app.post('/api/route/:action', requireAuth, (req, res) => dispatchTo(req, res, 'route', req.params.action, req.body));
 
 app.post('/api/action/:action', requireAuth, async (req, res) => {
-  const bot = await botFor(req, res); if (!bot) return;
   const { action } = req.params;
   if (action === 'start' || action === 'reconnect') {
-    if (!servers.isActive(await servers.getServer(req.session.serverId))) return res.status(403).json({ error: 'This bot is suspended or its time has run out. Contact the admin on Discord.' });
+    const s = await selectedServer(req);
+    if (!servers.isActive(s)) return res.status(403).json({ error: 'This bot is suspended or its time has run out. Contact the admin on Discord.' });
   }
-  if (action === 'start') bot.start();
-  else if (action === 'stop') bot.stop();
-  else if (action === 'reconnect') bot.reconnect();
-  else return res.status(404).json({ error: 'Unknown action' });
-  res.json(bot.state);
+  dispatchTo(req, res, 'action', action);
 });
 
-// PERF: the 3D viewer (a full prismarine-viewer renderer per bot) only runs
-// while someone actually has it open in the UI, not for the bot's whole
-// connected lifetime — see the note above BotSession.startViewer().
 app.post('/api/viewer/:action', requireAuth, async (req, res) => {
-  const bot = await botFor(req, res); if (!bot) return;
-  const { action } = req.params;
-  if (action === 'start' && !servers.PLANS[(await servers.getServer(req.session.serverId)).plan].viewer) {
-    return res.status(403).json({ error: 'The live 3D view needs a Pro or Premium plan.' });
+  const s = await selectedServer(req);
+  if (!s) return res.status(409).json({ error: 'No bot selected', code: 'NO_SERVER' });
+  if (req.params.action === 'start') {
+    if (!servers.PLANS[s.plan].viewer) return res.status(403).json({ error: 'The live 3D view needs a Pro or Premium plan.' });
+    if (s.nodeId !== 'local') return res.status(400).json({ error: 'The live 3D view is only available on the main node for now.' });
   }
-  if (action === 'start') {
-    const result = bot.startViewer();
-    if (!result.ok) return res.status(400).json({ error: result.error });
-  } else if (action === 'stop') {
-    bot.stopViewer();
-  } else {
-    return res.status(404).json({ error: 'Unknown viewer action' });
-  }
-  res.json({ viewerRunning: Boolean(bot.viewerPort) });
+  dispatchTo(req, res, 'viewer', req.params.action);
 });
 
 // ---------------------------------------------------------------------------
@@ -380,12 +335,13 @@ io.use((socket, next) => {
 io.on('connection', async socket => {
   const sid = socket.request.session?.serverId, s = sid && await servers.getServer(sid);
   if (!s || s.ownerLower !== socket.user.username.toLowerCase()) return socket.disconnect();
-  const bot = botManager.getOrCreate(s._id, io);
-  socket.join(bot.room);
-  socket.emit('state', bot.state);
-  socket.emit('history', bot.logs);
-  socket.emit('versions', bot.state.supportedVersions);
-  socket.emit('route', { recording: bot.routeRecording, points: bot.route });
+  socket.join(`bot:${s._id}`);
+  const snap = (await runOn(s, 'snapshot')).json;
+  if (!snap.state) return; // node offline: the dashboard keeps its last known state
+  socket.emit('state', snap.state);
+  socket.emit('history', snap.logs);
+  socket.emit('versions', snap.versions);
+  socket.emit('route', snap.route);
 });
 
 // ---------------------------------------------------------------------------
@@ -449,14 +405,21 @@ app.use((req, res) => {
 
 const panelPort = Number(process.env.PORT || process.env.PANEL_PORT || 3000);
 setInterval(() => { for (const bot of botManager.all()) bot.updateTelemetry(); }, 1000);
-// Stop bots whose plan has run out.
+// Stop bots that are suspended or out of time (on this node or a remote one).
+const stoppedRemote = new Set();
 setInterval(async () => {
-  for (const bot of botManager.all()) {
-    if (bot.state.status === 'offline') continue;
-    try {
-      if (!servers.isActive(await servers.getServer(bot.owner))) { bot.addLog('This bot is suspended or its time has run out, so it was stopped', 'warning'); bot.stop(); }
-    } catch { /* database hiccup, check again next minute */ }
-  }
+  try {
+    for (const s of await servers.listAll()) {
+      if (servers.isActive(s)) { stoppedRemote.delete(s._id); continue; }
+      if (s.nodeId === 'local') {
+        const b = botManager.get(s._id);
+        if (b && b.state.status !== 'offline') { b.addLog('This bot is suspended or its time has run out, so it was stopped', 'warning'); b.stop(); }
+      } else if (!stoppedRemote.has(s._id)) {
+        const r = await runOn(s, 'action', 'stop', {});
+        if (r.status === 200) stoppedRemote.add(s._id);
+      }
+    }
+  } catch { /* try again next minute */ }
 }, 60000);
 
 db.init().then(() => servers.init()).then(() => {
