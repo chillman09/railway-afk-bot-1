@@ -118,7 +118,10 @@ async function loadServers() {
   const [sr, nr] = await Promise.all([fetch('/api/admin/servers'), fetch('/api/admin/nodes')]);
   if (!sr.ok || !nr.ok) return;
   const { servers } = await sr.json(), { nodes } = await nr.json();
-  document.querySelector('#srv-node').innerHTML = '<option value="auto">Auto (best node)</option>' + nodes.map(n => `<option value="${esc(n.id)}" ${n.enabled && n.used < n.maxBots ? '' : 'disabled'}>${esc(n.name)} — ${n.used}/${n.maxBots} bots</option>`).join('');
+  document.querySelector('#srv-node').innerHTML = '<option value="auto">Auto (best node)</option>' + nodes.map(n => `<option value="${esc(n.id)}" ${n.enabled && n.online && n.used < n.maxBots ? '' : 'disabled'}>${esc(n.name)} — ${n.used}/${n.maxBots} bots${n.online ? '' : ' (offline)'}</option>`).join('');
+  document.querySelector('#node-count').textContent = `${nodes.length} node${nodes.length === 1 ? '' : 's'}`;
+  document.querySelector('#node-list').innerHTML = nodes.map(n => `<div class="route-point user-row"><div class="urow"><div><strong>${esc(n.name)}</strong><span>${n.used}/${n.maxBots} bots${n.stats ? ` · load ${n.stats.load.toFixed(2)} · ${n.stats.freeMb} MB free` : ''}${n.remote ? '' : ' · runs on the panel'}</span></div></div>
+    <div class="badges"><span class="badge ${n.online ? 'new' : ''}">${n.online ? 'online' : 'offline'}</span>${n.remote ? `<button class="point-go node-delete" data-id="${esc(n.id)}">Delete</button>` : ''}</div></div>`).join('');
   document.querySelector('#srv-count').textContent = `${servers.length} bot${servers.length === 1 ? '' : 's'}`;
   const list = document.querySelector('#srv-list');
   if (!servers.length) { list.innerHTML = '<span class="empty-route">No bots yet. Create one →</span>'; return; }
@@ -150,3 +153,20 @@ document.querySelector('#srv-form').addEventListener('submit', async e => {
   if (ok) loadServers();
 });
 loadServers();
+
+document.querySelector('#node-list').addEventListener('click', async e => {
+  const b = e.target.closest('.node-delete'); if (!b) return;
+  if (!(await window.confirmAction('Delete this node? Its agent will be disconnected.'))) return;
+  const r = await fetch(`/api/admin/nodes/${b.dataset.id}`, { method: 'DELETE' }); const d = await r.json().catch(() => ({}));
+  if (!r.ok) window.toast?.(d.error || 'Could not delete node', 'warn');
+  loadServers();
+});
+document.querySelector('#node-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.querySelector('#node-message');
+  const { ok, data } = await post('/api/admin/nodes', { name: document.querySelector('#node-name').value, maxBots: document.querySelector('#node-max').value });
+  msg.textContent = ok ? `Node created. Copy this now, it is shown only once:\n\nPANEL_URL=${location.origin}\nNODE_TOKEN=${data.token}` : data.error || 'Could not create node.';
+  msg.className = 'form-message ' + (ok ? 'success' : 'error');
+  if (ok) { document.querySelector('#node-name').value = ''; loadServers(); }
+});
+setInterval(loadServers, 15000);
