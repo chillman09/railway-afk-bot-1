@@ -139,3 +139,33 @@ body[data-loading] .spec strong,body[data-loading] .metric strong,body[data-load
 .nf{min-height:100vh;display:grid;place-items:center;text-align:center;padding:24px}.nf h1{font-size:clamp(90px,26vw,260px);line-height:.9;background:linear-gradient(180deg,#fff,var(--accent) 60%,var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
 .nf img{width:120px;image-rendering:pixelated;border:3px solid var(--line2);animation:drift 6s ease-in-out infinite}@keyframes drift{0%,100%{transform:translate(-30px,0) rotate(-8deg)}50%{transform:translate(30px,-18px) rotate(8deg)}}
 @media(max-width:900px){.dash-row{grid-template-columns:1fr}.toasts{right:10px;left:10px;bottom:84px}.toast{max-width:none}.badges .badge{display:none}}
+
+/* ===== motion pass (emil-design-eng / animate / choreograph) ===== */
+:root{--ease-out:cubic-bezier(.23,1,.32,1);--ease-in-out:cubic-bezier(.77,0,.175,1)}
+@view-transition{navigation:auto}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.22s;animation-timing-function:var(--ease-out)}
+.vt-theme::view-transition-old(root),.vt-theme::view-transition-new(root){animation:none;mix-blend-mode:normal}.vt-theme::view-transition-new(root){z-index:9}
+@keyframes fade{from{opacity:0}}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}}
+@keyframes ring{from{opacity:.7;transform:scale(1)}to{opacity:0;transform:scale(1.7)}}
+.tab,.admin-link,.logout-button{transition:color .15s ease,border-color .15s ease,background-color .15s ease}
+.info-button::after{transition:opacity .15s var(--ease-out),transform .15s var(--ease-out)}
+.button{transition:transform .12s var(--ease-out),box-shadow .12s var(--ease-out),border-color .15s ease,background-color .15s ease}
+@media(hover:hover) and (pointer:fine){.button:not(:disabled):hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 rgba(0,0,0,.45)}}
+.button:not(:disabled):active{transform:translate(3px,3px);box-shadow:0 0 0 #000}
+.toast{transition:opacity .2s var(--ease-out),transform .28s var(--ease-out)}
+.log-line{animation:logIn .18s var(--ease-out) both}@keyframes logIn{from{opacity:0;transform:translateX(-6px)}}
+.confirm-overlay{animation:fade .15s ease-out}.confirm-box{animation:pop .2s var(--ease-out) both}@keyframes pop{from{opacity:0;transform:scale(.95)}}
+.pal,.pal-box{animation:none}
+.view.active{animation:viewin .18s var(--ease-out) both}@keyframes viewin{from{opacity:0;transform:translateY(6px)}}
+.first .view.active{animation:none}.first .view.active>*,.first .user-list>*{animation:rise .5s var(--ease-out) both}
+.first .view.active>:nth-child(2){animation-delay:70ms}.first .view.active>:nth-child(3){animation-delay:130ms}.first .view.active>:nth-child(4){animation-delay:180ms}.first .view.active>:nth-child(5){animation-delay:220ms}.first .view.active>:nth-child(n+6){animation-delay:250ms}
+.first .user-list>:nth-child(2){animation-delay:50ms}.first .user-list>:nth-child(3){animation-delay:90ms}.first .user-list>:nth-child(4){animation-delay:120ms}.first .user-list>:nth-child(n+5){animation-delay:140ms}
+.tab-ind{position:absolute;left:0;top:0;z-index:0;pointer-events:none;border:2px solid var(--line2);background:linear-gradient(90deg,rgba(var(--tint),.45),rgba(var(--tint),.05));box-shadow:3px 3px 0 rgba(0,0,0,.4);transition:transform .26s var(--ease-in-out)}
+.side.has-ind .tab{position:relative;z-index:1}.side.has-ind .tab.active{background:none;border-color:transparent;box-shadow:none}
+.tick{animation:tick .5s var(--ease-out)}@keyframes tick{from{color:var(--aur);transform:translateY(-2px)}}
+.spec strong,.metric strong,.event-count,.clock,.win-v strong{font-variant-numeric:tabular-nums}
+.banner .orb{position:relative}.banner .orb::after{content:"";position:absolute;inset:-2px;border:2px solid var(--ok);opacity:0;pointer-events:none}.banner.live .orb::after{animation:ring 2.4s var(--ease-out) infinite}
+#viewer-frame-wrap:not([hidden]){animation:wipe .5s var(--ease-in-out) both}@keyframes wipe{from{opacity:0;clip-path:inset(0 0 100% 0)}}
+.login-card.leaving{opacity:0;transform:scale(.97) translateY(-6px);transition:opacity .2s var(--ease-out),transform .2s var(--ease-out)}
+@media(prefers-reduced-motion:reduce){.title span{opacity:1!important}.js [data-reveal],.js .steps [data-reveal]{transform:none!important}.js [data-reveal]{transition:opacity .25s ease!important}}
