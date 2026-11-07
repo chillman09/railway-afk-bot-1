@@ -12,11 +12,11 @@ admin to create one.
 
 ### 🔐 How accounts work
 
-- **Admin account** — defined entirely by environment variables
-  (`ADMIN_USERNAME` / `ADMIN_PASSWORD`). It is never written to disk. Log in
-  as the admin to reach `/admin` and create real user accounts.
+- **Admin account** — created in the database on first boot from the
+  `ADMIN_USERNAME` / `ADMIN_PASSWORD` variables (stored as a bcrypt hash).
+  Log in as the admin to reach `/admin` and create real user accounts.
 - **User accounts** — created only by the admin, from the `/admin` panel.
-  Passwords are hashed with bcrypt and stored in `data/users.json`. Each user
+  Passwords are hashed with bcrypt and stored in MongoDB (`MONGODB_URI`). Each user
   gets their own bot the moment they log in.
 
 ---
