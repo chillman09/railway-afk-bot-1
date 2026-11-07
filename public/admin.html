@@ -23,7 +23,7 @@
       <section class="hero-row">
         <div>
           <h1>Give people access.</h1>
-          <p class="lede">Create an account for each person who should run their own bot. There is no public sign-up — every account starts here.</p>
+          <p class="lede">Create an account for each person who should run their own bot. People can also register themselves; accounts start without a bot until you give them a plan or they redeem a code.</p>
         </div>
       </section>
 
@@ -45,6 +45,27 @@
             <p class="form-message" id="create-message"></p>
           </form>
           <div class="note"><span class="note-icon">i</span><p>Each user gets their own isolated bot: their own Minecraft server config, connection state, chat log, and saved route. Nothing is shared between accounts.</p></div>
+        </aside>
+      </section>
+
+      <section class="workspace admin-workspace">
+        <div class="panel console-panel">
+          <div class="panel-heading"><h2>Access codes</h2><span class="event-count" id="code-count">0 codes</span></div>
+          <div class="user-list" id="code-list"><span class="empty-route">No codes yet. Generate some →</span></div>
+        </div>
+        <aside class="panel controls-panel">
+          <div class="panel-heading"><h2>Generate codes</h2></div>
+          <form class="config-form" id="code-form" style="border-top:0;">
+            <label>Plan<select id="code-plan"><option value="basic">Basic</option><option value="pro">Pro</option><option value="premium">Premium</option></select></label>
+            <label>Days of access<input id="code-days" type="number" min="1" max="3650" value="30" required></label>
+            <label>Max redemptions (blank = unlimited)<input id="code-max" type="number" min="1" value="1"></label>
+            <label>Code stops working on (optional)<input id="code-exp" type="date"></label>
+            <label>How many codes<input id="code-count" type="number" min="1" max="50" value="1"></label>
+            <label>Note<input id="code-note" maxlength="80" placeholder="e.g. buyer name"></label>
+            <button class="button button-save" type="submit">Generate <span>+</span></button>
+            <p class="form-message" id="code-message"></p>
+          </form>
+          <label class="reg-toggle"><input type="checkbox" id="reg-open"> Open registration</label>
         </aside>
       </section>
 
