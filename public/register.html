@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora Bot / Create account</title>
+    <link rel="icon" type="image/png" href="/aurora-bot.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body class="login-body">
+    <main class="login-shell">
+      <div class="login-card">
+        <div class="login-brand"><img class="brand-mark" src="/aurora-bot.png" alt="Aurora Bot"><span>Aurora Bot</span></div>
+        <h1>Create account</h1>
+        <p class="lede">Already registered? <a href="/login">Sign in</a>. Accounts start without a bot; activate one with an access code from the admin.</p>
+
+        <form id="register-form" class="login-form">
+          <label>Username<input id="reg-username" autocomplete="username" required minlength="3" maxlength="32"></label>
+          <label>Password<input id="reg-password" type="password" autocomplete="new-password" minlength="6" placeholder="At least 6 characters" required></label>
+          <button class="button button-primary button-save" type="submit">Create account <span>→</span></button>
+          <p class="form-message" id="reg-message"></p>
+        </form>
+      </div>
+      <footer class="footer login-footer"><span>Aurora Bot</span><span>Bots are activated with an access code</span></footer>
+    </main>
+
+    <script src="/register.js"></script>
+      <script src="/fx.js"></script>
+  </body>
+</html>
