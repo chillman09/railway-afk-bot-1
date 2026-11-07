@@ -12,6 +12,7 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const { requireAuth, requireAdmin } = require('./lib/auth');
 const db = require('./lib/db');
 const userStore = require('./lib/userStore');
+const plans = require('./lib/plans');
 const botManager = require('./lib/botManager');
 const { isRateLimited, recordAttempt, clearAttempts } = require('./lib/rateLimiter');
 
@@ -133,8 +134,71 @@ app.delete('/api/admin/users/:username', requireAuth, requireAdmin, async (req, 
 });
 
 // ---------------------------------------------------------------------------
+// Registration, plans and access codes
+// ---------------------------------------------------------------------------
+const signups = new Map(); // ip -> timestamps (max 5 sign-ups per IP per hour)
+app.get('/api/public-config', async (req, res) => res.json({ registrationOpen: await plans.registrationOpen() }));
+
+app.post('/api/auth/register', async (req, res) => {
+  const ip = req.ip || 'unknown', now = Date.now();
+  const recent = (signups.get(ip) || []).filter(t => now - t < 3600e3);
+  if (recent.length >= 5) return res.status(429).json({ error: 'Too many sign-ups from this network. Try again later.' });
+  if (!(await plans.registrationOpen())) return res.status(403).json({ error: 'Registration is currently closed.' });
+  const { username, password } = req.body || {};
+  if (!username || !password || password.length < 6) return res.status(400).json({ error: 'Choose a username and a password of at least 6 characters' });
+  try {
+    const user = await userStore.createUser(String(username).trim(), password);
+    signups.set(ip, [...recent, now]);
+    const sessionUser = { username: user.username, role: user.role };
+    req.session.regenerate(err => {
+      if (err) return res.status(500).json({ error: 'Account created, please sign in' });
+      req.session.user = sessionUser;
+      req.session.save(() => res.json({ user: sessionUser }));
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/me/plan', requireAuth, async (req, res) => {
+  const e = plans.entitlement(await userStore.findUser(req.session.user.username));
+  res.json({ plan: e.plan, label: e.label, until: e.until, canRun: e.bots > 0, viewer: e.viewer, admin: Boolean(e.admin) });
+});
+
+app.post('/api/redeem', requireAuth, async (req, res) => {
+  const ip = req.ip || 'unknown';
+  if (isRateLimited('redeem:' + ip)) return res.status(429).json({ error: 'Too many attempts. Try again in a few minutes.' });
+  try {
+    res.json(await plans.redeemCode(req.session.user.username, req.body && req.body.code));
+  } catch (err) {
+    recordAttempt('redeem:' + ip);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/admin/codes', requireAuth, requireAdmin, async (req, res) => res.json({ codes: await plans.listCodes() }));
+app.post('/api/admin/codes', requireAuth, requireAdmin, async (req, res) => {
+  try { res.json({ codes: await plans.createCodes(req.body || {}) }); } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.post('/api/admin/codes/:code/toggle', requireAuth, requireAdmin, async (req, res) => {
+  try { res.json({ disabled: await plans.toggleCode(req.params.code) }); } catch (err) { res.status(404).json({ error: err.message }); }
+});
+app.post('/api/admin/users/:username/plan', requireAuth, requireAdmin, async (req, res) => {
+  try { await plans.setPlan(req.params.username, req.body && req.body.plan, req.body && req.body.days); res.json({ ok: true }); } catch (err) { res.status(400).json({ error: err.message }); }
+});
+app.get('/api/admin/settings', requireAuth, requireAdmin, async (req, res) => res.json({ registrationOpen: await plans.registrationOpen() }));
+app.post('/api/admin/settings', requireAuth, requireAdmin, async (req, res) => {
+  await plans.setRegistrationOpen(req.body && req.body.registrationOpen); res.json({ registrationOpen: await plans.registrationOpen() });
+});
+
+// ---------------------------------------------------------------------------
 // Pages
 // ---------------------------------------------------------------------------
+app.get('/register', (req, res) => {
+  if (req.session.user) return res.redirect('/');
+  res.sendFile(path.join(__dirname, 'public', 'register.html'));
+});
+
 app.get('/login', (req, res) => {
   if (req.session.user) return res.redirect('/');
   res.sendFile(path.join(__dirname, 'public', 'login.html'));
@@ -222,9 +286,13 @@ app.post('/api/route/:action', requireAuth, (req, res) => {
   res.json({ recording: bot.routeRecording, points: bot.route });
 });
 
-app.post('/api/action/:action', requireAuth, (req, res) => {
+app.post('/api/action/:action', requireAuth, async (req, res) => {
   const bot = botManager.getOrCreate(req.session.user.username, io);
   const { action } = req.params;
+  if (action === 'start' || action === 'reconnect') {
+    const e = plans.entitlement(await userStore.findUser(req.session.user.username));
+    if (e.bots < 1) return res.status(403).json({ error: 'No active plan. Redeem a code or contact the admin on Discord.' });
+  }
   if (action === 'start') bot.start();
   else if (action === 'stop') bot.stop();
   else if (action === 'reconnect') bot.reconnect();
@@ -235,9 +303,12 @@ app.post('/api/action/:action', requireAuth, (req, res) => {
 // PERF: the 3D viewer (a full prismarine-viewer renderer per bot) only runs
 // while someone actually has it open in the UI, not for the bot's whole
 // connected lifetime — see the note above BotSession.startViewer().
-app.post('/api/viewer/:action', requireAuth, (req, res) => {
+app.post('/api/viewer/:action', requireAuth, async (req, res) => {
   const bot = botManager.getOrCreate(req.session.user.username, io);
   const { action } = req.params;
+  if (action === 'start' && !plans.entitlement(await userStore.findUser(req.session.user.username)).viewer) {
+    return res.status(403).json({ error: 'The live 3D view needs a Pro or Premium plan.' });
+  }
   if (action === 'start') {
     const result = bot.startViewer();
     if (!result.ok) return res.status(400).json({ error: result.error });
@@ -330,6 +401,15 @@ app.use((req, res) => {
 
 const panelPort = Number(process.env.PORT || process.env.PANEL_PORT || 3000);
 setInterval(() => { for (const bot of botManager.all()) bot.updateTelemetry(); }, 1000);
+// Stop bots whose plan has run out.
+setInterval(async () => {
+  for (const bot of botManager.all()) {
+    if (bot.state.status === 'offline') continue;
+    try {
+      if (plans.entitlement(await userStore.findUser(bot.owner)).bots < 1) { bot.addLog('Your plan has expired, so the bot was stopped', 'warning'); bot.stop(); }
+    } catch { /* database hiccup, check again next minute */ }
+  }
+}, 60000);
 
 db.init().then(() => {
   httpServer.listen(panelPort, process.env.PANEL_HOST || '0.0.0.0', () => {
