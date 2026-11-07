@@ -7,6 +7,7 @@ async function loadUsers() {
 
 let allUsers = [];
 const esc = v => String(v).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
+const planActive = u => u.plan && u.plan !== 'free' && u.planUntil && new Date(u.planUntil) > new Date();
 function renderUsers(users) { allUsers = users; paintUsers(); }
 function paintUsers() {
   const q = (document.querySelector('#user-search')?.value || '').trim().toLowerCase();
@@ -24,6 +25,8 @@ function paintUsers() {
       <div class="badges">
         <span class="badge ${user.role === 'admin' ? 'admin' : ''}">${esc(user.role)}</span>
         ${isNew ? '<span class="badge new">new</span>' : ''}${user.username === me ? '<span class="badge you">you</span>' : ''}
+        <span class="badge ${planActive(user) ? 'new' : ''}">${planActive(user) ? esc(user.plan) + ' · ' + Math.ceil((new Date(user.planUntil) - Date.now()) / 864e5) + 'd' : 'free'}</span>
+        ${user.role === 'admin' ? '' : `<select class="plan-sel" aria-label="Plan">${['free', 'basic', 'pro', 'premium'].map(p => `<option value="${p}">${p}</option>`).join('')}</select><input class="plan-days" type="number" min="1" max="3650" value="30" aria-label="Days"><button class="point-go set-plan" data-username="${esc(user.username)}">Set</button>`}
         <button class="point-go delete-user" data-username="${esc(user.username)}">Remove</button>
       </div></div>`;
   }).join('');
@@ -77,3 +80,46 @@ document.querySelector('#create-user-form').addEventListener('submit', async eve
 setInterval(() => { document.querySelector('#clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }, 1000);
 
 loadUsers();
+
+// ---- plans, codes, registration ----
+const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(async r => ({ ok: r.ok, data: await r.json().catch(() => ({})) }));
+
+document.querySelector('#user-list').addEventListener('click', async event => {
+  const button = event.target.closest('.set-plan'); if (!button) return;
+  const row = button.closest('.user-row');
+  const { ok, data } = await post(`/api/admin/users/${encodeURIComponent(button.dataset.username)}/plan`, { plan: row.querySelector('.plan-sel').value, days: row.querySelector('.plan-days').value });
+  window.toast?.(ok ? `Updated ${button.dataset.username}` : data.error || 'Could not update plan', ok ? 'ok' : 'warn');
+  if (ok) loadUsers();
+});
+
+async function loadCodes() {
+  const response = await fetch('/api/admin/codes'); if (!response.ok) return;
+  const { codes } = await response.json();
+  document.querySelector('#code-count').textContent = `${codes.length} code${codes.length === 1 ? '' : 's'}`;
+  const list = document.querySelector('#code-list');
+  if (!codes.length) { list.innerHTML = '<span class="empty-route">No codes yet. Generate some →</span>'; return; }
+  list.innerHTML = codes.map(c => {
+    const expired = c.expiresAt && new Date(c.expiresAt) < new Date(), full = c.maxUses !== null && c.uses >= c.maxUses;
+    const state = c.disabled ? 'disabled' : expired ? 'expired' : full ? 'used up' : 'active';
+    return `<div class="route-point user-row"><div class="urow"><div><strong>${esc(c._id)}</strong><span>${esc(c.plan)} · ${c.days}d · ${c.uses}/${c.maxUses === null ? '∞' : c.maxUses} used${c.expiresAt ? ' · until ' + new Date(c.expiresAt).toLocaleDateString() : ''}${c.note ? ' · ' + esc(c.note) : ''}</span></div></div>
+      <div class="badges"><span class="badge ${state === 'active' ? 'new' : ''}">${state}</span><button class="point-go copy-code" data-code="${esc(c._id)}">Copy</button><button class="point-go toggle-code" data-code="${esc(c._id)}">${c.disabled ? 'Enable' : 'Disable'}</button></div></div>`;
+  }).join('');
+}
+document.querySelector('#code-list').addEventListener('click', async event => {
+  const copy = event.target.closest('.copy-code'), toggle = event.target.closest('.toggle-code');
+  if (copy) { navigator.clipboard?.writeText(copy.dataset.code); window.toast?.('Code copied', 'ok'); }
+  if (toggle) { await post(`/api/admin/codes/${encodeURIComponent(toggle.dataset.code)}/toggle`); loadCodes(); }
+});
+document.querySelector('#code-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const msg = document.querySelector('#code-message'), v = id => document.querySelector(id).value;
+  const exp = v('#code-exp');
+  const { ok, data } = await post('/api/admin/codes', { plan: v('#code-plan'), days: v('#code-days'), maxUses: v('#code-max') === '' ? null : v('#code-max'), expiresAt: exp ? new Date(exp + 'T23:59:59').toISOString() : null, count: v('#code-count'), note: v('#code-note') });
+  msg.textContent = ok ? `Created: ${data.codes.map(c => c._id).join(', ')}` : data.error || 'Could not create codes.';
+  msg.className = 'form-message ' + (ok ? 'success' : 'error');
+  if (ok) loadCodes();
+});
+const regBox = document.querySelector('#reg-open');
+fetch('/api/admin/settings').then(r => r.json()).then(s => { regBox.checked = s.registrationOpen; });
+regBox.addEventListener('change', async () => { const { data } = await post('/api/admin/settings', { registrationOpen: regBox.checked }); window.toast?.(data.registrationOpen ? 'Registration opened' : 'Registration closed', 'ok'); });
+loadCodes();
