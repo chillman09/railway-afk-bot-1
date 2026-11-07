@@ -7,8 +7,7 @@ async function loadUsers() {
 
 let allUsers = [];
 const esc = v => String(v).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
-const planActive = u => u.plan && u.plan !== 'free' && u.planUntil && new Date(u.planUntil) > new Date();
-function renderUsers(users) { allUsers = users; paintUsers(); }
+let renderUsers = function (users) { allUsers = users; paintUsers(); }
 function paintUsers() {
   const q = (document.querySelector('#user-search')?.value || '').trim().toLowerCase();
   const me = document.querySelector('#user-chip')?.textContent.trim();
@@ -25,8 +24,6 @@ function paintUsers() {
       <div class="badges">
         <span class="badge ${user.role === 'admin' ? 'admin' : ''}">${esc(user.role)}</span>
         ${isNew ? '<span class="badge new">new</span>' : ''}${user.username === me ? '<span class="badge you">you</span>' : ''}
-        <span class="badge ${planActive(user) ? 'new' : ''}">${planActive(user) ? esc(user.plan) + ' · ' + Math.ceil((new Date(user.planUntil) - Date.now()) / 864e5) + 'd' : 'free'}</span>
-        ${user.role === 'admin' ? '' : `<select class="plan-sel" aria-label="Plan">${['free', 'basic', 'pro', 'premium'].map(p => `<option value="${p}">${p}</option>`).join('')}</select><input class="plan-days" type="number" min="1" max="3650" value="30" aria-label="Days"><button class="point-go set-plan" data-username="${esc(user.username)}">Set</button>`}
         <button class="point-go delete-user" data-username="${esc(user.username)}">Remove</button>
       </div></div>`;
   }).join('');
@@ -84,14 +81,6 @@ loadUsers();
 // ---- plans, codes, registration ----
 const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(async r => ({ ok: r.ok, data: await r.json().catch(() => ({})) }));
 
-document.querySelector('#user-list').addEventListener('click', async event => {
-  const button = event.target.closest('.set-plan'); if (!button) return;
-  const row = button.closest('.user-row');
-  const { ok, data } = await post(`/api/admin/users/${encodeURIComponent(button.dataset.username)}/plan`, { plan: row.querySelector('.plan-sel').value, days: row.querySelector('.plan-days').value });
-  window.toast?.(ok ? `Updated ${button.dataset.username}` : data.error || 'Could not update plan', ok ? 'ok' : 'warn');
-  if (ok) loadUsers();
-});
-
 async function loadCodes() {
   const response = await fetch('/api/admin/codes'); if (!response.ok) return;
   const { codes } = await response.json();
@@ -123,3 +112,41 @@ const regBox = document.querySelector('#reg-open');
 fetch('/api/admin/settings').then(r => r.json()).then(s => { regBox.checked = s.registrationOpen; });
 regBox.addEventListener('change', async () => { const { data } = await post('/api/admin/settings', { registrationOpen: regBox.checked }); window.toast?.(data.registrationOpen ? 'Registration opened' : 'Registration closed', 'ok'); });
 loadCodes();
+
+// ---- servers (bots) and nodes ----
+async function loadServers() {
+  const [sr, nr] = await Promise.all([fetch('/api/admin/servers'), fetch('/api/admin/nodes')]);
+  if (!sr.ok || !nr.ok) return;
+  const { servers } = await sr.json(), { nodes } = await nr.json();
+  document.querySelector('#srv-node').innerHTML = '<option value="auto">Auto (best node)</option>' + nodes.map(n => `<option value="${esc(n.id)}" ${n.enabled && n.used < n.maxBots ? '' : 'disabled'}>${esc(n.name)} — ${n.used}/${n.maxBots} bots</option>`).join('');
+  document.querySelector('#srv-count').textContent = `${servers.length} bot${servers.length === 1 ? '' : 's'}`;
+  const list = document.querySelector('#srv-list');
+  if (!servers.length) { list.innerHTML = '<span class="empty-route">No bots yet. Create one →</span>'; return; }
+  list.innerHTML = servers.map(s => `<div class="route-point user-row"><div class="urow"><div><strong>${esc(s.name)}</strong><span>${esc(s.owner)} · ${esc(s.label)} · ${s.until ? 'until ' + new Date(s.until).toLocaleDateString() : 'no expiry'} · ${esc(s.node || '?')}</span></div></div>
+    <div class="badges"><span class="badge ${s.active ? 'new' : ''}">${s.suspended ? 'suspended' : s.active ? 'active' : 'expired'}</span>
+    <button class="point-go srv-renew" data-id="${s.id}">+30d</button><button class="point-go srv-suspend" data-id="${s.id}">${s.suspended ? 'Unsuspend' : 'Suspend'}</button><button class="point-go srv-delete" data-id="${s.id}">Delete</button></div></div>`).join('');
+}
+function fillOwners() {
+  const me = document.querySelector('#user-chip')?.textContent.trim();
+  const names = [...new Set([me, ...allUsers.map(u => u.username)].filter(n => n && n !== '--'))];
+  const sel = document.querySelector('#srv-owner'), keep = sel.value;
+  sel.innerHTML = names.map(n => `<option>${esc(n)}</option>`).join(''); if (names.includes(keep)) sel.value = keep;
+}
+const baseRender = renderUsers;
+renderUsers = users => { baseRender(users); fillOwners(); };
+document.querySelector('#srv-list').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return; const id = b.dataset.id;
+  if (b.classList.contains('srv-delete')) { if (!(await window.confirmAction('Delete this bot? Its saved settings and route are removed.'))) return; await fetch(`/api/admin/servers/${id}`, { method: 'DELETE' }); }
+  else if (b.classList.contains('srv-suspend')) await post(`/api/admin/servers/${id}/suspend`);
+  else if (b.classList.contains('srv-renew')) await post(`/api/admin/servers/${id}/renew`, { days: 30 });
+  loadServers();
+});
+document.querySelector('#srv-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const v = id => document.querySelector(id).value, msg = document.querySelector('#srv-message');
+  const { ok, data } = await post('/api/admin/servers', { owner: v('#srv-owner'), name: v('#srv-name'), nodeId: v('#srv-node'), plan: v('#srv-plan'), days: v('#srv-days') });
+  msg.textContent = ok ? `Created "${data.server.name}" for ${data.server.owner}.` : data.error || 'Could not create bot.';
+  msg.className = 'form-message ' + (ok ? 'success' : 'error');
+  if (ok) loadServers();
+});
+loadServers();
