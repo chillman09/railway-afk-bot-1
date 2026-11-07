@@ -12,7 +12,7 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 const { requireAuth, requireAdmin } = require('./lib/auth');
 const db = require('./lib/db');
 const userStore = require('./lib/userStore');
-const plans = require('./lib/plans');
+const servers = require('./lib/servers');
 const botManager = require('./lib/botManager');
 const { isRateLimited, recordAttempt, clearAttempts } = require('./lib/rateLimiter');
 
@@ -128,22 +128,22 @@ app.post('/api/admin/users', requireAuth, requireAdmin, async (req, res) => {
 
 app.delete('/api/admin/users/:username', requireAuth, requireAdmin, async (req, res) => {
   const { username } = req.params;
-  botManager.remove(username);
+  for (const id of await servers.deleteForOwner(username)) botManager.remove(id);
   const removed = await userStore.deleteUser(username);
   res.json({ removed });
 });
 
 // ---------------------------------------------------------------------------
-// Registration, plans and access codes
+// Registration, servers (bots), nodes and access codes
 // ---------------------------------------------------------------------------
 const signups = new Map(); // ip -> timestamps (max 5 sign-ups per IP per hour)
-app.get('/api/public-config', async (req, res) => res.json({ registrationOpen: await plans.registrationOpen() }));
+app.get('/api/public-config', async (req, res) => res.json({ registrationOpen: await servers.registrationOpen() }));
 
 app.post('/api/auth/register', async (req, res) => {
   const ip = req.ip || 'unknown', now = Date.now();
   const recent = (signups.get(ip) || []).filter(t => now - t < 3600e3);
   if (recent.length >= 5) return res.status(429).json({ error: 'Too many sign-ups from this network. Try again later.' });
-  if (!(await plans.registrationOpen())) return res.status(403).json({ error: 'Registration is currently closed.' });
+  if (!(await servers.registrationOpen())) return res.status(403).json({ error: 'Registration is currently closed.' });
   const { username, password } = req.body || {};
   if (!username || !password || password.length < 6) return res.status(400).json({ error: 'Choose a username and a password of at least 6 characters' });
   try {
@@ -160,36 +160,77 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.get('/api/me/plan', requireAuth, async (req, res) => {
-  const e = plans.entitlement(await userStore.findUser(req.session.user.username));
-  res.json({ plan: e.plan, label: e.label, until: e.until, canRun: e.bots > 0, viewer: e.viewer, admin: Boolean(e.admin) });
-});
+const view = (s, nodeName) => ({ id: s._id, name: s.name, plan: s.plan, label: servers.PLANS[s.plan].label, viewer: servers.PLANS[s.plan].viewer, until: s.until, suspended: s.suspended, active: servers.isActive(s), node: nodeName });
+const mine = async req => (await servers.listForOwner(req.session.user.username));
 
+app.get('/api/servers', requireAuth, async (req, res) => {
+  const nodeNames = Object.fromEntries((await servers.listNodes()).map(n => [n.id, n.name]));
+  res.json({ servers: (await mine(req)).map(s => view(s, nodeNames[s.nodeId])), current: req.session.serverId || null });
+});
+app.get('/api/servers/current', requireAuth, async (req, res) => {
+  const s = req.session.serverId && await servers.getServer(req.session.serverId);
+  if (!s || s.ownerLower !== req.session.user.username.toLowerCase()) return res.status(404).json({ error: 'No bot selected' });
+  res.json(view(s));
+});
+app.post('/api/servers/:id/select', requireAuth, async (req, res) => {
+  const s = await servers.getServer(req.params.id);
+  if (!s || s.ownerLower !== req.session.user.username.toLowerCase()) return res.status(404).json({ error: 'Bot not found' });
+  req.session.serverId = s._id;
+  req.session.save(() => res.json({ ok: true }));
+});
 app.post('/api/redeem', requireAuth, async (req, res) => {
   const ip = req.ip || 'unknown';
   if (isRateLimited('redeem:' + ip)) return res.status(429).json({ error: 'Too many attempts. Try again in a few minutes.' });
   try {
-    res.json(await plans.redeemCode(req.session.user.username, req.body && req.body.code));
+    const s = await servers.redeemCode(req.session.user.username, req.body && req.body.code);
+    res.json({ server: view(s) });
   } catch (err) {
     recordAttempt('redeem:' + ip);
     res.status(400).json({ error: err.message });
   }
 });
 
-app.get('/api/admin/codes', requireAuth, requireAdmin, async (req, res) => res.json({ codes: await plans.listCodes() }));
+const fail = (res, err, code = 400) => res.status(code).json({ error: err.message });
+app.get('/api/admin/nodes', requireAuth, requireAdmin, async (req, res) => res.json({ nodes: await servers.listNodes() }));
+app.get('/api/admin/servers', requireAuth, requireAdmin, async (req, res) => {
+  const nodeNames = Object.fromEntries((await servers.listNodes()).map(n => [n.id, n.name]));
+  res.json({ servers: (await servers.listAll()).map(s => ({ ...view(s, nodeNames[s.nodeId]), owner: s.owner })) });
+});
+app.post('/api/admin/servers', requireAuth, requireAdmin, async (req, res) => {
+  try { res.json({ server: await servers.createServer(req.body || {}) }); } catch (err) { fail(res, err); }
+});
+app.post('/api/admin/servers/:id/suspend', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const suspended = await servers.toggleSuspend(req.params.id);
+    if (suspended) botManager.get(req.params.id)?.stop();
+    res.json({ suspended });
+  } catch (err) { fail(res, err, 404); }
+});
+app.post('/api/admin/servers/:id/renew', requireAuth, requireAdmin, async (req, res) => {
+  try { await servers.renew(req.params.id, req.body && req.body.days); res.json({ ok: true }); } catch (err) { fail(res, err); }
+});
+app.delete('/api/admin/servers/:id', requireAuth, requireAdmin, async (req, res) => {
+  botManager.remove(req.params.id);
+  res.json({ removed: await servers.deleteServer(req.params.id) });
+});
+app.get('/api/admin/codes', requireAuth, requireAdmin, async (req, res) => res.json({ codes: await servers.listCodes() }));
 app.post('/api/admin/codes', requireAuth, requireAdmin, async (req, res) => {
-  try { res.json({ codes: await plans.createCodes(req.body || {}) }); } catch (err) { res.status(400).json({ error: err.message }); }
+  try { res.json({ codes: await servers.createCodes(req.body || {}) }); } catch (err) { fail(res, err); }
 });
 app.post('/api/admin/codes/:code/toggle', requireAuth, requireAdmin, async (req, res) => {
-  try { res.json({ disabled: await plans.toggleCode(req.params.code) }); } catch (err) { res.status(404).json({ error: err.message }); }
+  try { res.json({ disabled: await servers.toggleCode(req.params.code) }); } catch (err) { fail(res, err, 404); }
 });
-app.post('/api/admin/users/:username/plan', requireAuth, requireAdmin, async (req, res) => {
-  try { await plans.setPlan(req.params.username, req.body && req.body.plan, req.body && req.body.days); res.json({ ok: true }); } catch (err) { res.status(400).json({ error: err.message }); }
-});
-app.get('/api/admin/settings', requireAuth, requireAdmin, async (req, res) => res.json({ registrationOpen: await plans.registrationOpen() }));
+app.get('/api/admin/settings', requireAuth, requireAdmin, async (req, res) => res.json({ registrationOpen: await servers.registrationOpen() }));
 app.post('/api/admin/settings', requireAuth, requireAdmin, async (req, res) => {
-  await plans.setRegistrationOpen(req.body && req.body.registrationOpen); res.json({ registrationOpen: await plans.registrationOpen() });
+  await servers.setRegistrationOpen(req.body && req.body.registrationOpen); res.json({ registrationOpen: await servers.registrationOpen() });
 });
+
+// Resolve the bot for the server this session has selected (and check it belongs to them).
+async function botFor(req, res) {
+  const s = req.session.serverId && await servers.getServer(req.session.serverId);
+  if (!s || s.ownerLower !== req.session.user.username.toLowerCase()) { res.status(409).json({ error: 'No bot selected', code: 'NO_SERVER' }); return null; }
+  return botManager.getOrCreate(s._id, io);
+}
 
 // ---------------------------------------------------------------------------
 // Pages
@@ -208,11 +249,17 @@ app.get('/admin', requireAuth, requireAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-app.get('/', (req, res) => {
+app.get('/servers', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'servers.html')));
+
+app.get('/', async (req, res) => {
   // The same URL shows different pages depending on login, so never cache it.
   res.set({ 'Cache-Control': 'no-store, must-revalidate', Vary: 'Cookie' });
-  const page = req.session?.user ? 'index.html' : 'landing.html';
-  res.sendFile(path.join(__dirname, 'public', page));
+  const user = req.session?.user;
+  if (!user) return res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+  const list = await servers.listForOwner(user.username);
+  if (req.session.serverId && list.some(s => s._id === req.session.serverId)) return res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  if (list.length === 1) { req.session.serverId = list[0]._id; return req.session.save(() => res.sendFile(path.join(__dirname, 'public', 'index.html'))); }
+  res.sendFile(path.join(__dirname, 'public', 'servers.html')); // none or several: pick / redeem
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -221,27 +268,27 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Bot control API — every route below is scoped to req.session.user.username,
 // so each logged-in user only ever sees and controls their own bot instance.
 // ---------------------------------------------------------------------------
-app.get('/api/state', requireAuth, (req, res) => {
-  const bot = botManager.getOrCreate(req.session.user.username, io);
+app.get('/api/state', requireAuth, async (req, res) => {
+  const bot = await botFor(req, res); if (!bot) return;
   res.json({ state: bot.state, logs: bot.logs, supportedVersions: bot.state.supportedVersions });
 });
 
-app.post('/api/chat', requireAuth, (req, res) => {
-  const bot = botManager.getOrCreate(req.session.user.username, io);
+app.post('/api/chat', requireAuth, async (req, res) => {
+  const bot = await botFor(req, res); if (!bot) return;
   const message = typeof req.body.message === 'string' ? req.body.message.trim() : '';
   if (!message) return res.status(400).json({ error: 'Message is required' });
   res.json({ sent: bot.sendChat(message) });
 });
 
-app.post('/api/config', requireAuth, (req, res) => {
-  const bot = botManager.getOrCreate(req.session.user.username, io);
+app.post('/api/config', requireAuth, async (req, res) => {
+  const bot = await botFor(req, res); if (!bot) return;
   const result = bot.updateConfig(req.body || {});
   if (!result.ok) return res.status(400).json({ error: result.error });
   res.json({ state: bot.state });
 });
 
-app.post('/api/route/:action', requireAuth, (req, res) => {
-  const bot = botManager.getOrCreate(req.session.user.username, io);
+app.post('/api/route/:action', requireAuth, async (req, res) => {
+  const bot = await botFor(req, res); if (!bot) return;
   const { action } = req.params;
 
   if (action === 'start') {
@@ -287,11 +334,10 @@ app.post('/api/route/:action', requireAuth, (req, res) => {
 });
 
 app.post('/api/action/:action', requireAuth, async (req, res) => {
-  const bot = botManager.getOrCreate(req.session.user.username, io);
+  const bot = await botFor(req, res); if (!bot) return;
   const { action } = req.params;
   if (action === 'start' || action === 'reconnect') {
-    const e = plans.entitlement(await userStore.findUser(req.session.user.username));
-    if (e.bots < 1) return res.status(403).json({ error: 'No active plan. Redeem a code or contact the admin on Discord.' });
+    if (!servers.isActive(await servers.getServer(req.session.serverId))) return res.status(403).json({ error: 'This bot is suspended or its time has run out. Contact the admin on Discord.' });
   }
   if (action === 'start') bot.start();
   else if (action === 'stop') bot.stop();
@@ -304,9 +350,9 @@ app.post('/api/action/:action', requireAuth, async (req, res) => {
 // while someone actually has it open in the UI, not for the bot's whole
 // connected lifetime — see the note above BotSession.startViewer().
 app.post('/api/viewer/:action', requireAuth, async (req, res) => {
-  const bot = botManager.getOrCreate(req.session.user.username, io);
+  const bot = await botFor(req, res); if (!bot) return;
   const { action } = req.params;
-  if (action === 'start' && !plans.entitlement(await userStore.findUser(req.session.user.username)).viewer) {
+  if (action === 'start' && !servers.PLANS[(await servers.getServer(req.session.serverId)).plan].viewer) {
     return res.status(403).json({ error: 'The live 3D view needs a Pro or Premium plan.' });
   }
   if (action === 'start') {
@@ -331,8 +377,10 @@ io.use((socket, next) => {
   next();
 });
 
-io.on('connection', socket => {
-  const bot = botManager.getOrCreate(socket.user.username, io);
+io.on('connection', async socket => {
+  const sid = socket.request.session?.serverId, s = sid && await servers.getServer(sid);
+  if (!s || s.ownerLower !== socket.user.username.toLowerCase()) return socket.disconnect();
+  const bot = botManager.getOrCreate(s._id, io);
   socket.join(bot.room);
   socket.emit('state', bot.state);
   socket.emit('history', bot.logs);
@@ -360,7 +408,7 @@ function getViewerProxyForUser(username) {
 }
 
 app.use('/viewer', requireAuth, (req, res, next) => {
-  const proxy = getViewerProxyForUser(req.session.user.username);
+  const proxy = getViewerProxyForUser(req.session.serverId);
   if (!proxy) return res.status(503).send('Live view is not available yet. Start the bot and wait for it to connect.');
   return proxy(req, res, next);
 });
@@ -372,8 +420,8 @@ httpServer.on('upgrade', (request, socket, head) => {
   if (!request.url.startsWith('/viewer')) return; // let socket.io's own listener handle the rest
   const fakeRes = { getHeader() {}, setHeader() {}, end() {}, writeHead() {}, on() {}, once() {}, emit() {} };
   sessionMiddleware(request, fakeRes, () => {
-    const username = request.session?.user?.username;
-    const proxy = username ? getViewerProxyForUser(username) : null;
+    const sid = request.session?.serverId;
+    const proxy = sid ? getViewerProxyForUser(sid) : null;
     if (!proxy) { socket.destroy(); return; }
     proxy.upgrade(request, socket, head);
   });
@@ -406,12 +454,12 @@ setInterval(async () => {
   for (const bot of botManager.all()) {
     if (bot.state.status === 'offline') continue;
     try {
-      if (plans.entitlement(await userStore.findUser(bot.owner)).bots < 1) { bot.addLog('Your plan has expired, so the bot was stopped', 'warning'); bot.stop(); }
+      if (!servers.isActive(await servers.getServer(bot.owner))) { bot.addLog('This bot is suspended or its time has run out, so it was stopped', 'warning'); bot.stop(); }
     } catch { /* database hiccup, check again next minute */ }
   }
 }, 60000);
 
-db.init().then(() => {
+db.init().then(() => servers.init()).then(() => {
   httpServer.listen(panelPort, process.env.PANEL_HOST || '0.0.0.0', () => {
     console.log(`Control panel running on port ${panelPort}`);
     console.log(`Admin login: ${ADMIN_USERNAME}`);
