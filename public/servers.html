@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aurora Bot / Your bots</title>
+    <link rel="icon" type="image/png" href="/aurora-bot.png">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand"><img class="brand-mark" src="/aurora-bot.png" alt="Aurora Bot"><span>Aurora Bot</span></div>
+        <div class="topbar-meta">
+          <a class="admin-link" id="admin-link" href="/admin" hidden>Admin</a>
+          <span class="user-chip" id="user-chip">--</span>
+          <button class="logout-button" id="logout-button" title="Log out">Log out</button>
+        </div>
+      </header>
+      <section class="hero-row"><div><h1>Your bots.</h1><p class="lede">Pick a bot to manage. Bots are added by the admin, or when you redeem an access code.</p></div></section>
+      <section class="workspace admin-workspace">
+        <div class="panel console-panel">
+          <div class="panel-heading"><h2>Bots</h2><span class="event-count" id="bot-count">0 bots</span></div>
+          <div class="user-list" id="bot-list"></div>
+        </div>
+        <aside class="panel controls-panel">
+          <div class="panel-heading"><h2>Redeem a code</h2></div>
+          <form class="config-form" id="redeem-form" style="border-top:0;">
+            <label>Access code<input id="redeem-code" autocomplete="off" placeholder="AUR-XXXX-XXXX" required></label>
+            <button class="button button-save" type="submit">Redeem <span>+</span></button>
+            <p class="form-message" id="redeem-message"></p>
+          </form>
+          <div class="note"><span class="note-icon">i</span><p>Want a bot? Message the admin on Discord to buy a code, or ask for one to be assigned to your account.</p></div>
+        </aside>
+      </section>
+      <footer class="footer"><span>Aurora Bot</span><span>Your bots</span></footer>
+    </main>
+    <script src="/auth-nav.js"></script>
+    <script src="/servers.js"></script>
+    <script src="/fx.js"></script>
+  </body>
+</html>
