@@ -4,7 +4,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start:node": "node node-agent/agent.js"
   },
   "engines": {
     "node": ">=22"
@@ -26,6 +27,7 @@
     "mongodb": "^6.10.0",
     "prismarine-viewer": "^1.33.0",
     "socket.io": "^4.8.3",
+    "socket.io-client": "^4.7.5",
     "socks": "^2.8.7"
   }
 }
