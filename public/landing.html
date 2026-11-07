@@ -47,6 +47,16 @@
 #boot{position:fixed;inset:0;background:var(--bg);z-index:300;display:grid;place-items:center;transition:opacity .5s}#boot.out{opacity:0;pointer-events:none}
 #boot .bt{width:min(380px,84vw);font:14px/1.8 var(--font-mono);color:var(--aur)}#boot .bar{height:14px;border:2px solid var(--line2);margin-top:14px}#boot .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--aur));transition:width .3s steps(5)}
 .mw{position:relative;display:block;transition:transform .2s}.eye{position:absolute;top:46%;width:7.5%;height:7.5%;transform:translate(-50%,-50%);background:#f3d2ff;box-shadow:0 0 16px #d98bff;opacity:.8;mix-blend-mode:screen;transition:transform .08s}
+.nav{padding:6px 8px 6px 12px;border:2px solid transparent;transition:background-color .2s ease,border-color .2s ease}.nav.solid{background:var(--glass);border-color:var(--line);backdrop-filter:blur(14px)}
+.cap{filter:blur(6px);transition:opacity .25s var(--ease-out),transform .25s var(--ease-out),filter .25s var(--ease-out)}.cap.on{filter:none;transition-duration:.5s;transition-delay:.12s}
+.cloud{position:absolute;width:90px;height:22px;background:#fff;opacity:.8;animation:cl 70s linear infinite both}.cloud::before{content:"";position:absolute;left:18px;top:-16px;width:46px;height:20px;background:#fff}
+@keyframes cl{from{transform:translate3d(-20vw,0,0)}to{transform:translate3d(120vw,0,0)}}
+.walker{animation-play-state:paused}.walker.walking{animation-play-state:running}
+.title span{transition:translate .25s var(--ease-out),rotate .25s var(--ease-out)}
+.eye{animation:blink 5s infinite}@keyframes blink{0%,93%,100%{scale:1 1}96%{scale:1 .1}}
+.card{transition:scale .2s var(--ease-out)}
+.cta .button-primary{position:relative}.cta .button-primary::after{content:"";position:absolute;inset:-2px;border:2px solid var(--aur);opacity:0;pointer-events:none;animation:ring 2.4s var(--ease-out) 2.5s infinite}
+.win-log{min-height:86px;overflow:hidden}
 </style></head><body><div id="boot"><div class="bt"><p></p><div class="bar"><i></i></div></div></div>
 <nav class="nav"><a class="brand" href="/" style="text-decoration:none;color:var(--text)"><img class="brand-mark" src="/aurora-bot.png" alt="">Aurora Bot</a><a class="button button-primary magnet" href="/login">Sign in <span>→</span></a></nav>
 
@@ -58,7 +68,7 @@
 </div></header>
 
 <section class="scene" id="scene"><div class="stick">
-<div class="sky"></div><div class="night" id="night"></div>
+<div class="sky"></div><div class="cloud" style="top:12%;animation-duration:80s;animation-delay:-20s"></div><div class="cloud" style="top:26%;animation-duration:110s;animation-delay:-70s;transform:scale(.7)"></div><div class="cloud" style="top:6%;animation-duration:95s;animation-delay:-45s"></div><div class="night" id="night"></div>
 <div class="orb" id="sun"></div><div class="orb moon" id="moon"></div>
 <div class="caps">
 <div class="cap on"><h2>It logs itself in.</h2><p>Registers and signs in on AuthMe servers, and accepts teleport requests.</p></div>
@@ -100,18 +110,36 @@
 <script>
 const $=s=>document.querySelector(s),clamp=v=>Math.max(0,Math.min(1,v)),prog=el=>{const r=el.getBoundingClientRect();return clamp(-r.top/(r.height-innerHeight))};
 const caps=[...document.querySelectorAll('.cap')],flags=[...document.querySelectorAll('.flag')],track=$('#track');
-function tick(){
-  let p=prog($('#scene'));
-  $('#night').style.opacity=clamp((p-.55)*3);$('#sun').style.opacity=1-clamp((p-.35)*3);$('#moon').style.opacity=clamp((p-.6)*3);
-  $('#sun').style.left=`${8+p*60}%`;$('#sun').style.top=`${50-Math.sin(clamp(p*1.3)*Math.PI)*38}%`;$('#moon').style.left=`${45+p*40}%`;$('#moon').style.top=`${22-p*8}%`;
-  $('#walker').style.left=`${4+p*84}%`;
+const nd=$('#night'),sun=$('#sun'),moon=$('#moon'),wk=$('#walker'),win=$('#win'),pvs=$('#pv'),scn=$('#scene'),hzs=$('#hz'),hc=$('.hero>div'),ttl=$('.title'),pm=$('#pm'),hp=$('.hero p'),cards=[...document.querySelectorAll('.card')],nav=$('.nav'),still=matchMedia('(prefers-reduced-motion:reduce)').matches;
+let lastY=scrollY,vel=0,pend=0;
+function tick(){pend=0;
+  const vw=innerWidth,vh=innerHeight,sy=scrollY,rs=scn.getBoundingClientRect(),rp=pvs.getBoundingClientRect(),rh=hzs.getBoundingClientRect(),cr=cards.map(c=>c.getBoundingClientRect());
+  const p=clamp(-rs.top/(rs.height-vh)),q=clamp((vh-rp.top)/(vh*.85)),hh=clamp(-rh.top/(rh.height-vh));
+  vel=sy-lastY;lastY=sy;
+  nd.style.opacity=clamp((p-.55)*3);sun.style.opacity=1-clamp((p-.35)*3);moon.style.opacity=clamp((p-.6)*3);
+  sun.style.left=`${8+p*60}%`;sun.style.top=`${50-Math.sin(clamp(p*1.3)*Math.PI)*38}%`;moon.style.left=`${45+p*40}%`;moon.style.top=`${22-p*8}%`;
+  wk.style.left=`${4+p*84}%`;
   flags.forEach((f,i)=>f.classList.toggle('lit',p>[.22,.45,.7][i]));
   const a=Math.min(3,Math.floor(p*4));caps.forEach((c,i)=>c.classList.toggle('on',i===a));
-  const q=clamp((innerHeight-$('#pv').getBoundingClientRect().top)/(innerHeight*.85));$('#win').style.transform=`perspective(1400px) rotateX(${(1-q)*42}deg) scale(${.84+.16*q})`;
-  const sy=scrollY,hc=$('.hero>div');if(sy<innerHeight*1.2){hc.style.opacity=Math.max(0,1-sy/(innerHeight*.9));$('.title').style.transform=`translate3d(0,${sy*.22}px,0)`;$('#pm').style.transform=`translate3d(0,${sy*.12}px,0)`;$('.hero p').style.transform=`translate3d(0,${sy*.32}px,0)`}
-  let h=prog($('#hz'));track.style.transform=`translateX(${-h*(track.scrollWidth-innerWidth)}px)`;
+  win.style.transform=`perspective(1400px) rotateX(${(1-q)*42}deg) scale(${.84+.16*q})`;
+  if(sy<vh*1.2){hc.style.opacity=Math.max(0,1-sy/(vh*.9));ttl.style.transform=`translate3d(0,${sy*.22}px,0)`;pm.style.transform=`translate3d(0,${sy*.12}px,0)`;hp.style.transform=`translate3d(0,${sy*.32}px,0)`}
+  track.style.transform=`translateX(${-hh*(track.scrollWidth-vw)}px)`;
+  cards.forEach((c,i)=>{const r=cr[i];c.style.scale=1-Math.min(1,Math.abs(r.left+r.width/2-vw/2)/(vw*.55))*.07});
+  nav.classList.toggle('solid',sy>40);
 }
-addEventListener('scroll',tick,{passive:true});addEventListener('resize',tick);tick();
+const req=()=>pend||(pend=requestAnimationFrame(tick));
+addEventListener('scroll',req,{passive:true});addEventListener('resize',req);tick();
+if(!still){ /* scroll velocity drives the marquee speed and the walker */
+  const mqa=$('.marq div').getAnimations()[0];
+  (function loop(){vel*=.92;if(mqa)mqa.playbackRate+=((1+Math.min(8,Math.abs(vel)*.35))-mqa.playbackRate)*.1;wk.classList.toggle('walking',Math.abs(vel)>.4);requestAnimationFrame(loop)})();
+  if(matchMedia('(hover:hover) and (pointer:fine)').matches){ /* hero letters shy away from the cursor */
+    const Ls=[...document.querySelectorAll('.title span')];let mx=-999,my=-999,pq=0;
+    addEventListener('pointermove',e=>{mx=e.clientX;my=e.clientY;pq||(pq=requestAnimationFrame(()=>{pq=0;if(scrollY>innerHeight*.8)return;const rs=Ls.map(l=>l.getBoundingClientRect());Ls.forEach((l,i)=>{const r=rs[i],dx=r.left+r.width/2-mx,dy=r.top+r.height/2-my,d=Math.hypot(dx,dy)||1,f=Math.max(0,1-d/240);l.style.translate=`${dx/d*f*22}px ${dy/d*f*22}px`;l.style.rotate=`${dx/d*f*9}deg`})}))},{passive:true});
+  }
+  const msgs=['<span>[12:31]</span> &lt;Alex&gt; afk?','<span>[12:31]</span> Bot: Still here.','<span>[12:40]</span> Reached checkpoint: wheat','<span>[12:52]</span> &lt;Sam&gt; !help','<span>[12:52]</span> Bot: Try !route, !status'],lg=$('.win-log'),lt=$('#lat');let mi=0,seen=false;
+  new IntersectionObserver(es=>{seen=es[0].isIntersecting},{threshold:.4}).observe(win);
+  setInterval(()=>{if(!seen||document.hidden)return;const d=document.createElement('div');d.innerHTML=msgs[mi++%msgs.length];d.style.animation='logIn .18s var(--ease-out) both';lg.appendChild(d);while(lg.children.length>4)lg.firstElementChild.remove();lt.textContent=(38+Math.round(Math.random()*14))+' ms'},2400);
+}
 (()=>{const b=$('#boot'),go=()=>document.body.classList.add('go'),ready=()=>document.fonts.ready.then(()=>requestAnimationFrame(go));let seen=0;try{seen=sessionStorage.getItem('ab')}catch{}
 if(seen||matchMedia('(prefers-reduced-motion:reduce)').matches){b.remove();ready();setTimeout(go,1500);return}
 const L=['> booting aurora...','> loading night sky... ok','> waking the bot... ok','> ready.'],p=b.querySelector('p'),bar=b.querySelector('i');
