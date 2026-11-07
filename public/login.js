@@ -26,6 +26,8 @@ document.querySelector('#login-form').addEventListener('submit', async event => 
       window.sfx?.('error');
       return;
     }
+    document.querySelector('.login-card').classList.add('leaving');
+    await new Promise(r => setTimeout(r, 220));
     window.location.replace('/');
   } catch {
     message.textContent = 'Could not reach the server. Try again.';
