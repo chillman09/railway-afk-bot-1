@@ -7,6 +7,8 @@
   const small = innerWidth < 800, step = small ? 40 : 26;
   const stars = Array.from({ length: small ? 60 : 110 }, () => ({ x: Math.random(), y: Math.random() * .75, s: Math.random() < .15 ? 3 : 2, p: Math.random() * 6 }));
   const rib = [[262, .30, .9], [158, .42, 1.3], [285, .24, .7]];
+  let sv = 0, lastSY = scrollY;
+  const ff = Array.from({ length: small ? 14 : 30 }, () => ({ x: Math.random(), y: Math.random(), v: .00025 + Math.random() * .0005, p: Math.random() * 6 }));
   function size() {
     W = innerWidth; H = innerHeight; k = small ? .35 : .5;
     cv.width = W * k; cv.height = H * k;
@@ -38,13 +40,17 @@
         g.setTransform(k, 0, 0, k, 0, y * k); g.fillRect(x, -H * .28, step + 1, H * .28 + 40);
       }
     });
+    const dy = scrollY - lastSY; lastSY = scrollY; sv = sv * .85 + dy * .15;
+    g.globalCompositeOperation = 'source-over'; g.setTransform(k, 0, 0, k, 0, 0); g.fillStyle = '#8dffd0';
+    ff.forEach(f => { f.y -= f.v * (1 + Math.min(3, Math.abs(sv) * .05)); if (f.y < -.02) f.y = 1.02; g.globalAlpha = .25 + .55 * Math.abs(Math.sin(t * 3 + f.p)); g.fillRect(((f.x * W) + Math.sin(t * 2 + f.p) * 14) | 0, (f.y * H) | 0, 3, 3); });
+    g.globalAlpha = 1;
   }
   requestAnimationFrame(draw);
   if (still) { t = 3; draw(1000); }
   addEventListener('pointermove', e => { mx = e.clientX / W; my = e.clientY / H; glow.style.transform = `translate3d(${e.clientX}px,${e.clientY}px,0)`; }, { passive: true });
   addEventListener('scroll', () => { bar.style.transform = `scaleX(${scrollY / Math.max(1, document.body.scrollHeight - innerHeight)})`; }, { passive: true });
   document.addEventListener('visibilitychange', () => !document.hidden && requestAnimationFrame(draw));
-  document.querySelectorAll('.banner,.metric,.panel,.login-card,.note,.hero-row').forEach((e, i) => { e.dataset.reveal = ''; e.style.setProperty('--d', (i % 4) * .08 + 's'); });
+  document.querySelectorAll('.banner,.metric,.panel,.login-card,.note,.hero-row').forEach((e, i) => { if (e.closest('.view')) return; e.dataset.reveal = ''; e.style.setProperty('--d', (i % 4) * .08 + 's'); });
   const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && (e.target.classList.add('in'), io.unobserve(e.target))), { threshold: .1 });
   document.querySelectorAll('[data-reveal]').forEach(e => io.observe(e));
   document.querySelectorAll('.magnet').forEach(b => {
@@ -52,14 +58,14 @@
     b.addEventListener('pointerleave', () => b.style.transform = '');
   });
   // 3D tilt on cards (hover devices only)
-  if (matchMedia('(hover:hover)').matches && !still) document.querySelectorAll('.card,.metric,.steps .panel').forEach(el => {
+  if (matchMedia('(hover:hover)').matches && !still) document.querySelectorAll('.card,.steps .panel').forEach(el => {
     el.addEventListener('pointerenter', () => el.style.transition = 'transform .12s');
     el.addEventListener('pointermove', e => { const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5; el.style.transform = `perspective(700px) rotateY(${x * 12}deg) rotateX(${-y * 12}deg) translateZ(6px)`; });
     el.addEventListener('pointerleave', () => { el.style.transition = ''; el.style.transform = ''; });
   });
   // pixel burst on button press
   addEventListener('pointerdown', e => {
-    if (still || !e.target.closest('.button,.tab,.command-form button')) return;
+    if (still || !e.target.closest('.button-primary,.button-save')) return;
     for (let i = 0; i < 9; i++) {
       const p = document.createElement('i'); p.className = 'px'; p.style.left = e.clientX + 'px'; p.style.top = e.clientY + 'px';
       p.style.background = ['#5dffb4', '#b690ff', '#fff'][i % 3]; document.body.appendChild(p);
@@ -110,7 +116,35 @@
     });
   };
   addEventListener('pointerdown', e => e.target.closest('.button,.tab,.command-form button') && sfx('click'));
-  document.addEventListener('click', e => { const b = e.target.closest('[data-theme-btn]'); if (b) setTheme(b.dataset.themeBtn); });
   const st = document.querySelector('#sound-toggle');
   if (st) { st.checked = soundOn(); st.addEventListener('change', () => { try { localStorage.setItem('aurora-sound', st.checked ? '1' : '0'); } catch {} sfx('join'); }); }
+
+  // ---- motion pass ----
+  if (document.querySelector('.app,.user-list')) { root.classList.add('first'); setTimeout(() => root.classList.remove('first'), 1400); }
+  const side = document.querySelector('.side'), tabs = [...document.querySelectorAll('.tab')];
+  if (side && tabs.length) { // sliding tab indicator: one element travels, so the highlight has a spatial story
+    const ind = document.createElement('i'); ind.className = 'tab-ind'; side.prepend(ind);
+    const place = instant => { const a = tabs.find(t => t.classList.contains('active')); if (!a) return;
+      if (instant) ind.style.transition = 'none';
+      ind.style.width = a.offsetWidth + 'px'; ind.style.height = a.offsetHeight + 'px'; ind.style.transform = `translate(${a.offsetLeft}px,${a.offsetTop}px)`;
+      if (instant) { void ind.offsetWidth; ind.style.transition = ''; } };
+    place(true); side.classList.add('has-ind');
+    tabs.forEach(t => t.addEventListener('click', () => requestAnimationFrame(() => place())));
+    addEventListener('resize', () => place(true)); document.fonts && document.fonts.ready.then(() => place(true));
+  }
+  // flash only values that actually changed (and the live ring on the connection orb)
+  const prev = new WeakMap(), banner = document.querySelector('.banner'), stat = document.querySelector('#status');
+  const sync = () => { if (!banner || !stat) return; const s = stat.textContent.toLowerCase(); banner.classList.toggle('live', /online|connected|ready/.test(s) && !/offline|disconnect/.test(s)); };
+  const mo = new MutationObserver(ms => { ms.forEach(m => { const el = m.target.nodeType === 1 ? m.target : m.target.parentElement; if (!el) return;
+    const txt = el.textContent; if (prev.get(el) === txt) return; const first = !prev.has(el); prev.set(el, txt);
+    if (first || still || document.body.hasAttribute('data-loading')) return; el.classList.remove('tick'); void el.offsetWidth; el.classList.add('tick'); }); sync(); });
+  document.querySelectorAll('#health,#food,#status,#last-event,#navigation-mode').forEach(el => { prev.set(el, el.textContent); mo.observe(el, { childList: true, characterData: true, subtree: true }); });
+  sync();
+  // theme change: circular reveal from the clicked swatch (rare action, so it can afford delight)
+  document.addEventListener('click', e => { const b = e.target.closest('[data-theme-btn]'); if (!b) return;
+    const n = b.dataset.themeBtn; if (still || !document.startViewTransition) return setTheme(n);
+    const r = b.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, R = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    root.classList.add('vt-theme'); const vt = document.startViewTransition(() => setTheme(n));
+    vt.ready.then(() => root.animate({ clipPath: [`circle(0 at ${x}px ${y}px)`, `circle(${R}px at ${x}px ${y}px)`] }, { duration: 650, easing: 'cubic-bezier(.77,0,.175,1)', pseudoElement: '::view-transition-new(root)' }));
+    vt.finished.finally(() => root.classList.remove('vt-theme')); });
 })();
