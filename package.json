@@ -7,7 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "keywords": [],
   "author": "",
@@ -16,15 +16,16 @@
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "canvas": "^3.2.3",
+    "connect-mongo": "^5.1.0",
     "dotenv": "^16.4.5",
     "express": "^5.2.1",
     "express-session": "^1.18.0",
     "http-proxy-middleware": "^2.0.10",
     "mineflayer": "^4.39.0",
     "mineflayer-pathfinder": "^2.4.5",
+    "mongodb": "^6.10.0",
     "prismarine-viewer": "^1.33.0",
-    "session-file-store": "^1.5.0",
-    "socks": "^2.8.7",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "socks": "^2.8.7"
   }
 }
