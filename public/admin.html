@@ -50,6 +50,22 @@
 
       <section class="workspace admin-workspace">
         <div class="panel console-panel">
+          <div class="panel-heading"><h2>Nodes</h2><span class="event-count" id="node-count">0 nodes</span></div>
+          <div class="user-list" id="node-list"></div>
+        </div>
+        <aside class="panel controls-panel">
+          <div class="panel-heading"><h2>Add a node</h2></div>
+          <form class="config-form" id="node-form" style="border-top:0;">
+            <label>Name<input id="node-name" maxlength="40" required placeholder="e.g. Railway - Sam"></label>
+            <label>Max bots<input id="node-max" type="number" min="1" max="1000" value="10" required></label>
+            <button class="button button-save" type="submit">Add node <span>+</span></button>
+            <p class="form-message" id="node-message" style="white-space:pre-wrap;word-break:break-all"></p>
+          </form>
+        </aside>
+      </section>
+
+      <section class="workspace admin-workspace">
+        <div class="panel console-panel">
           <div class="panel-heading"><h2>Bots</h2><span class="event-count" id="srv-count">0 bots</span></div>
           <div class="user-list" id="srv-list"><span class="empty-route">No bots yet. Create one →</span></div>
         </div>
