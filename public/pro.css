@@ -1,0 +1,43 @@
+/* Professional skin for the app pages (dashboard, admin, login, bots).
+   Flat surfaces, 1px borders, system fonts, calm accent, no pixel effects. */
+:root{--bg:#0b0d12;--glass:#12151c;--line:#232836;--line2:#343c52;--text:#e9ecf3;--muted:#9aa3b5;--text-faint:#677188;
+--accent:#9a8cff;--accent2:#6f60f5;--aur:#34d399;--ok:#34d399;--warn:#fbbf24;--danger:#f87171;--tint:111,96,245;
+--font-display:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--font-body:var(--font-display);--font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+body{background:var(--bg);-webkit-font-smoothing:antialiased;font-size:14px}
+h1,h2,h3{font-weight:600;letter-spacing:-.01em}
+.shell{max-width:1200px}
+.topbar,.connection-card,.panel,.metric,.login-card{background:var(--glass);border:1px solid var(--line);border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.35)}
+.topbar{margin-bottom:28px;padding:10px 14px}
+.brand{font-size:17px;font-weight:600}.brand-mark{image-rendering:auto;border:0;border-radius:8px;width:30px;height:30px}
+.topbar-divider{width:1px}
+.hero-row h1{background:none;-webkit-text-fill-color:var(--text);color:var(--text);font-size:clamp(26px,3.4vw,34px);max-width:none;line-height:1.15}
+.lede{font-size:14px}
+.panel{padding:18px}.panel-heading h2{font-size:16px}.telemetry-heading h3,.subheading h3{font-size:14px}
+.metric strong,.spec strong{font-weight:600}.spec,.metric{border-radius:10px}
+.spec,.console,.command-form,.viewer-frame,.confirm-box,.pal-box,.toast,.info-button,.info-button::after{border-width:1px;border-radius:8px}
+.console{background:#07090d}.command-form{background:#07090d;border-radius:8px}
+.confirm-box,.pal-box{background:var(--glass);box-shadow:0 12px 40px rgba(0,0,0,.5)}
+.toast{background:var(--glass);box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.button,.admin-link,.logout-button,.command-form button,.point-go{border:1px solid var(--line2);border-radius:8px;box-shadow:none;font:500 13px var(--font-body);background:rgba(255,255,255,.03)}
+.button{padding:9px 14px}
+.button:hover,.admin-link:hover,.logout-button:hover,.point-go:hover{border-color:var(--accent);color:var(--text);background:rgba(var(--tint),.12)}
+@media(hover:hover) and (pointer:fine){.button:not(:disabled):hover{transform:none;box-shadow:none}}
+.button:not(:disabled):active{transform:scale(.98);box-shadow:none}
+.button-primary,.button-save,.command-form button{background:var(--accent2);border-color:transparent;color:#fff}
+.button-primary:hover,.button-save:hover{background:#8174ff;border-color:transparent}
+.button-danger{background:none;border-color:rgba(248,113,113,.5)}.button-record{background:none}
+.route-section,.config-form{border-top:1px solid var(--line)}.runtime-list div{border-bottom:1px solid var(--line)}
+.mark,.route-indicator,.pip{border-radius:50%}.pip{border-radius:3px}
+input,select,textarea{background:#0b0d12;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:9px 12px;font:14px var(--font-body)}
+input:focus,select:focus,textarea:focus{outline:2px solid rgba(var(--tint),.45);outline-offset:0;border-color:var(--accent)}
+.command-form input{border:0;background:none;padding:8px 0;outline:0}.command-form:focus-within{border-color:var(--accent)}
+.badge,.event-count,.beta-badge{border-radius:999px;font-weight:600;font-size:11px}
+.badge{border:1px solid var(--line2);padding:2px 10px}
+.route-point,.user-row{border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.015);padding:10px 14px}
+.side,.tab{border-radius:8px}.tab{border:1px solid transparent}
+.tab-ind{border:1px solid var(--line2);border-radius:8px;background:rgba(var(--tint),.14);box-shadow:none}
+.side.has-ind .tab.active{background:none;border-color:transparent}
+.tab.active,.tab:hover{color:var(--text)}
+.login-card{padding:28px;max-width:400px}
+.note{border-radius:8px;border:1px solid var(--line)}
+a{color:var(--accent)}
