@@ -47,8 +47,8 @@
 #boot{position:fixed;inset:0;background:var(--bg);z-index:300;display:grid;place-items:center;transition:opacity .5s}#boot.out{opacity:0;pointer-events:none}
 #boot .bt{width:min(380px,84vw);font:14px/1.8 var(--font-mono);color:var(--aur)}#boot .bar{height:14px;border:2px solid var(--line2);margin-top:14px}#boot .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--aur));transition:width .3s steps(5)}
 .mw{position:relative;display:block;transition:transform .2s}.eye{position:absolute;top:46%;width:7.5%;height:7.5%;transform:translate(-50%,-50%);background:#f3d2ff;box-shadow:0 0 16px #d98bff;opacity:.8;mix-blend-mode:screen;transition:transform .08s}
-.nav{padding:6px 8px 6px 12px;border:2px solid transparent;transition:background-color .2s ease,border-color .2s ease}.nav.solid{background:var(--glass);border-color:var(--line);backdrop-filter:blur(14px)}
-.cap{filter:blur(6px);transition:opacity .25s var(--ease-out),transform .25s var(--ease-out),filter .25s var(--ease-out)}.cap.on{filter:none;transition-duration:.5s;transition-delay:.12s}
+.nav{padding:6px 8px 6px 12px;border:2px solid transparent;transition:background-color .2s ease,border-color .2s ease}.nav.solid{background:rgba(14,12,32,.94);border-color:var(--line);}
+.cap{transition:opacity .25s var(--ease-out),transform .25s var(--ease-out)}.cap.on{transition-duration:.5s;transition-delay:.12s}
 .cloud{position:absolute;width:90px;height:22px;background:#fff;opacity:.8;animation:cl 70s linear infinite both}.cloud::before{content:"";position:absolute;left:18px;top:-16px;width:46px;height:20px;background:#fff}
 @keyframes cl{from{transform:translate3d(-20vw,0,0)}to{transform:translate3d(120vw,0,0)}}
 .walker{animation-play-state:paused}.walker.walking{animation-play-state:running}
@@ -154,12 +154,4 @@ new IntersectionObserver((es,o)=>{if(!es[0].isIntersecting)return;o.disconnect()
 const G='#$%&*+<>?/',scr=el=>{const t=el.textContent;let n=0;const iv=setInterval(()=>{el.textContent=[...t].map((c,i)=>i<n||c===' '?c:G[Math.random()*G.length|0]).join('');if((n+=.7)>t.length){el.textContent=t;clearInterval(iv)}},35)};
 document.querySelectorAll('.sec>h2,.pv h2').forEach(h=>new IntersectionObserver((es,o)=>{if(es[0].isIntersecting){o.disconnect();matchMedia('(prefers-reduced-motion:reduce)').matches||scr(h)}},{threshold:.6}).observe(h));
 
-/* inertia scroll: wheel input eases toward a target instead of jumping */
-if(!matchMedia('(prefers-reduced-motion:reduce)').matches&&matchMedia('(hover:hover)').matches){
-  document.documentElement.style.scrollBehavior='auto';
-  let target=scrollY,cur=scrollY,raf=0;const max=()=>document.body.scrollHeight-innerHeight;
-  const loop=()=>{cur+=(target-cur)*.085;if(Math.abs(target-cur)<.4){cur=target;raf=0}else raf=requestAnimationFrame(loop);scrollTo(0,cur)};
-  addEventListener('wheel',e=>{if(e.ctrlKey||e.target.closest('textarea,iframe'))return;e.preventDefault();if(!raf)cur=target=scrollY;target=Math.max(0,Math.min(max(),target+e.deltaY*(e.deltaMode===1?32:1)));if(!raf)raf=requestAnimationFrame(loop)},{passive:false});
-  addEventListener('scroll',()=>{if(!raf)cur=target=scrollY},{passive:true});
-}
 </script></body></html>
