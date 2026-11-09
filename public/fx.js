@@ -1,6 +1,7 @@
 (() => {
   const root = document.documentElement, still = matchMedia('(prefers-reduced-motion: reduce)').matches;
   root.classList.add('js');
+  const lite = !document.getElementById('scene'); // only the landing page gets the animated sky
   const mk = (t, id) => { const e = document.createElement(t); e.id = id; document.body.prepend(e); return e; };
   const cv = mk('canvas', 'aurora'), glow = mk('div', 'glow'), bar = mk('div', 'progress'), g = cv.getContext('2d');
   let W, H, k, mx = .5, my = .5, t = 0, last = 0, grads = [];
@@ -8,7 +9,7 @@
   const stars = Array.from({ length: small ? 60 : 110 }, () => ({ x: Math.random(), y: Math.random() * .75, s: Math.random() < .15 ? 3 : 2, p: Math.random() * 6 }));
   const rib = [[262, .30, .9], [158, .42, 1.3], [285, .24, .7]];
   let sv = 0, lastSY = scrollY;
-  const ff = Array.from({ length: small ? 14 : 30 }, () => ({ x: Math.random(), y: Math.random(), v: .00025 + Math.random() * .0005, p: Math.random() * 6 }));
+  const ff = Array.from({ length: 0 }, () => ({ x: Math.random(), y: Math.random(), v: .00025 + Math.random() * .0005, p: Math.random() * 6 }));
   function size() {
     W = innerWidth; H = innerHeight; k = small ? .35 : .5;
     cv.width = W * k; cv.height = H * k;
@@ -45,11 +46,10 @@
     ff.forEach(f => { f.y -= f.v * (1 + Math.min(3, Math.abs(sv) * .05)); if (f.y < -.02) f.y = 1.02; g.globalAlpha = .25 + .55 * Math.abs(Math.sin(t * 3 + f.p)); g.fillRect(((f.x * W) + Math.sin(t * 2 + f.p) * 14) | 0, (f.y * H) | 0, 3, 3); });
     g.globalAlpha = 1;
   }
-  requestAnimationFrame(draw);
-  if (still) { t = 3; draw(1000); }
-  addEventListener('pointermove', e => { mx = e.clientX / W; my = e.clientY / H; glow.style.transform = `translate3d(${e.clientX}px,${e.clientY}px,0)`; }, { passive: true });
+  if (!lite) { requestAnimationFrame(draw); if (still) { t = 3; draw(1000); } } else { cv.remove(); glow.remove(); }
+  addEventListener('pointermove', e => { if (lite) return; mx = e.clientX / W; my = e.clientY / H; glow.style.transform = `translate3d(${e.clientX}px,${e.clientY}px,0)`; }, { passive: true });
   addEventListener('scroll', () => { bar.style.transform = `scaleX(${scrollY / Math.max(1, document.body.scrollHeight - innerHeight)})`; }, { passive: true });
-  document.addEventListener('visibilitychange', () => !document.hidden && requestAnimationFrame(draw));
+  document.addEventListener('visibilitychange', () => !lite && !document.hidden && requestAnimationFrame(draw));
   document.querySelectorAll('.banner,.metric,.panel,.login-card,.note,.hero-row').forEach((e, i) => { if (e.closest('.view')) return; e.dataset.reveal = ''; e.style.setProperty('--d', (i % 4) * .08 + 's'); });
   const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && (e.target.classList.add('in'), io.unobserve(e.target))), { threshold: .1 });
   document.querySelectorAll('[data-reveal]').forEach(e => io.observe(e));
