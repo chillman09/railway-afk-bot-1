@@ -4,7 +4,7 @@
     if (!res.ok) { window.location.href = '/login'; return; }
     const { user } = await res.json();
     const chip = document.querySelector('#user-chip');
-    if (chip) chip.textContent = `${user.username} · ${user.role}`;
+    if (chip) chip.textContent = user.username === user.role ? user.username : `${user.username} · ${user.role}`;
     const adminLink = document.querySelector('#admin-link');
     if (adminLink) adminLink.hidden = user.role !== 'admin';
   } catch {
