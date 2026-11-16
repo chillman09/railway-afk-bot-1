@@ -1,172 +1,120 @@
-async function loadUsers() {
-  const response = await fetch('/api/admin/users');
-  if (!response.ok) return;
-  const { users } = await response.json();
-  renderUsers(users);
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const esc = v => String(v ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
+const api = (url, method = 'GET', body) => fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined }).then(async r => ({ ok: r.ok, data: await r.json().catch(() => ({})) }));
+const D = { users: [], servers: [], nodes: [], codes: [], reg: true };
+const days = iso => (iso ? Math.ceil((new Date(iso) - Date.now()) / 864e5) : null);
+const date = iso => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'None');
+const pill = (c, t) => `<span class="pill ${c}">${esc(t)}</span>`;
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+function botPill(s) {
+  if (s.suspended) return pill('bad', 'Suspended');
+  if (!s.active) return pill('bad', 'Expired');
+  if (s.status === 'online') return pill('ok', 'Online');
+  if (s.status === 'offline') return pill('', 'Offline');
+  if (s.status === 'node offline') return pill('bad', 'Node offline');
+  return pill('warn', s.status);
+}
+const table = (head, rows, empty) => rows.length ? `<table class="tbl"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table>` : `<div class="empty"><strong>${empty[0]}</strong>${empty[1] || ''}</div>`;
+
+async function loadAll() {
+  const [u, s, n, c, g] = await Promise.all([api('/api/admin/users'), api('/api/admin/servers'), api('/api/admin/nodes'), api('/api/admin/codes'), api('/api/admin/settings')]);
+  if (u.ok) D.users = u.data.users; if (s.ok) D.servers = s.data.servers; if (n.ok) D.nodes = n.data.nodes; if (c.ok) D.codes = c.data.codes; if (g.ok) D.reg = g.data.registrationOpen;
+  render();
 }
 
-let allUsers = [];
-const esc = v => String(v).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;');
-let renderUsers = function (users) { allUsers = users; paintUsers(); }
-function paintUsers() {
-  const q = (document.querySelector('#user-search')?.value || '').trim().toLowerCase();
-  const me = document.querySelector('#user-chip')?.textContent.trim();
-  const shown = allUsers.filter(u => u.username.toLowerCase().includes(q));
-  document.querySelector('#user-count').textContent = `${shown.length} user${shown.length === 1 ? '' : 's'}`;
-  const list = document.querySelector('#user-list');
-  if (!shown.length) { list.innerHTML = `<span class="empty-route">${allUsers.length ? 'No users match your search.' : 'No users yet. Create the first one →'}</span>`; return; }
-  list.innerHTML = shown.map(user => {
-    const hue = [...user.username].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7);
-    const isNew = Date.now() - new Date(user.createdAt) < 7 * 864e5;
-    return `<div class="route-point user-row">
-      <div class="urow"><span class="avatar" style="background:hsl(${hue} 75% 62%)">${esc(user.username[0] || '?').toUpperCase()}</span>
-        <div><strong>${esc(user.username)}</strong><span>added ${new Date(user.createdAt).toLocaleDateString()}</span></div></div>
-      <div class="badges">
-        <span class="badge ${user.role === 'admin' ? 'admin' : ''}">${esc(user.role)}</span>
-        ${isNew ? '<span class="badge new">new</span>' : ''}${user.username === me ? '<span class="badge you">you</span>' : ''}
-        <button class="point-go delete-user" data-username="${esc(user.username)}">Remove</button>
-      </div></div>`;
-  }).join('');
-  list.querySelectorAll('.delete-user').forEach(button => {
-    button.addEventListener('click', async () => {
-      const username = button.dataset.username;
-      const confirmed = await window.confirmAction(`Remove "${username}"? Their bot will be stopped and they'll lose access immediately.`);
-      if (!confirmed) return;
-      await fetch(`/api/admin/users/${encodeURIComponent(username)}`, { method: 'DELETE' });
-      window.toast?.(`Removed ${username}`, 'warn');
-      loadUsers();
-    });
+function render() {
+  const online = D.servers.filter(s => s.status === 'online').length, nodesUp = D.nodes.filter(n => n.online).length;
+  const liveCodes = D.codes.filter(c => !c.disabled && (!c.expiresAt || new Date(c.expiresAt) > new Date()) && (c.maxUses === null || c.uses < c.maxUses)).length;
+  const issues = [];
+  D.nodes.filter(n => !n.online).forEach(n => issues.push(['bad', 'Node offline', `${n.name} is not connected. Its bots are not running.`, '#nodes']));
+  D.nodes.filter(n => n.online && n.used / n.maxBots >= .9).forEach(n => issues.push(['warn', 'Node nearly full', `${n.name} holds ${n.used} of ${n.maxBots} bots.`, '#nodes']));
+  D.servers.forEach(s => {
+    const d = days(s.until);
+    if (s.suspended) issues.push(['warn', 'Bot suspended', `${s.name} (${s.owner})`, '#bots']);
+    else if (d !== null && d < 0) issues.push(['bad', 'Bot expired', `${s.name} (${s.owner}) ended ${date(s.until)}`, '#bots']);
+    else if (d !== null && d <= 3) issues.push(['warn', 'Bot ending soon', `${s.name} (${s.owner}) ends in ${plural(d, 'day')}`, '#bots']);
   });
-}
-document.querySelector('#user-search').addEventListener('input', paintUsers);
+  $('#title').textContent = issues.length ? `${plural(issues.length, 'thing')} need${issues.length === 1 ? 's' : ''} attention` : 'Everything is running';
+  $('#sub').textContent = `${plural(D.servers.length, 'bot')} on ${plural(D.nodes.length, 'node')}, ${plural(D.users.length, 'user')}.`;
+  $('#kpis').innerHTML = [
+    ['Bots online', `${online} / ${D.servers.length}`, `${D.servers.length - online} not running`, D.servers.length && online === D.servers.length ? 'good' : ''],
+    ['Nodes online', `${nodesUp} / ${D.nodes.length}`, nodesUp === D.nodes.length ? 'All connected' : `${D.nodes.length - nodesUp} offline`, nodesUp === D.nodes.length ? 'good' : 'bad'],
+    ['Users', D.users.length, D.reg ? 'Registration open' : 'Registration closed', ''],
+    ['Live codes', liveCodes, `${D.codes.length} created in total`, '']
+  ].map(([l, v, s, c]) => `<div class="kpi ${c}"><span>${l}</span><strong>${esc(v)}</strong><small>${esc(s)}</small></div>`).join('');
+  $('#attention').innerHTML = table(['Issue', 'Details', ''], issues.map(([c, t, d, h]) => `<tr><td>${pill(c, t)}</td><td>${esc(d)}</td><td class="act"><a class="button btn-sm" href="${h}">View</a></td></tr>`), ['Nothing needs attention', 'All nodes are connected and no bot is expiring soon.']);
 
-document.querySelector('#create-user-form').addEventListener('submit', async event => {
-  event.preventDefault();
-  const message = document.querySelector('#create-message');
-  const button = event.target.querySelector('button[type="submit"]');
-  const payload = {
-    username: document.querySelector('#new-username').value.trim(),
-    password: document.querySelector('#new-password').value
-  };
+  const ownerBots = {}; D.servers.forEach(s => ownerBots[s.owner] = (ownerBots[s.owner] || 0) + 1);
+  $('#bots').innerHTML = table(['Bot', 'Owner', 'Node', 'Type', 'Status', 'Expires', ''], D.servers.map(s => `<tr><td><span class="name">${esc(s.name)}</span><span class="sub mono">${esc(s.id)}</span></td><td>${esc(s.owner)}</td><td>${esc(s.node || '?')}</td><td>${esc(s.label)}</td><td>${botPill(s)}</td><td class="${days(s.until) !== null && days(s.until) <= 3 ? 'warn-text' : ''}">${date(s.until)}</td><td class="act"><button class="button btn-sm" data-act="renew" data-id="${s.id}">+30 days</button><button class="button btn-sm" data-act="suspend" data-id="${s.id}">${s.suspended ? 'Unsuspend' : 'Suspend'}</button><button class="button btn-sm button-danger" data-act="delete-bot" data-id="${s.id}">Delete</button></td></tr>`), ['No bots yet', 'Create one for a user.']);
 
-  button.disabled = true;
-  button.classList.add('is-loading');
-  try {
-    const response = await fetch('/api/admin/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      message.textContent = data.error || 'Could not create user.';
-      message.className = 'form-message error';
-      return;
-    }
-    message.textContent = `Created "${data.user.username}".`;
-    message.className = 'form-message success';
-    document.querySelector('#new-username').value = '';
-    document.querySelector('#new-password').value = '';
-    loadUsers();
-  } finally {
-    button.disabled = false;
-    button.classList.remove('is-loading');
-  }
-});
+  const q = $('#user-search').value.trim().toLowerCase();
+  const users = D.users.filter(u => u.username.toLowerCase().includes(q));
+  $('#users').innerHTML = table(['User', 'Bots', 'Joined', ''], users.map(u => `<tr><td><span class="name">${esc(u.username)}</span></td><td>${ownerBots[u.username] || 0}</td><td>${date(u.createdAt)}</td><td class="act"><button class="button btn-sm button-danger" data-act="delete-user" data-id="${esc(u.username)}">Remove</button></td></tr>`), [q ? 'No matching users' : 'No users yet', q ? 'Try another name.' : 'People can register themselves, or you can add them.']);
 
-setInterval(() => { document.querySelector('#clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }, 1000);
+  $('#nodes').innerHTML = table(['Node', 'Status', 'Capacity', 'Load', ''], D.nodes.map(n => {
+    const pct = Math.min(100, Math.round(100 * n.used / n.maxBots));
+    return `<tr><td><span class="name">${esc(n.name)}</span><span class="sub">${n.remote ? 'Remote agent' : 'Runs on the panel'}</span></td><td>${n.online ? pill('ok', 'Online') : pill('bad', 'Offline')}</td><td>${n.used} / ${n.maxBots} bots<div class="bar ${pct >= 100 ? 'full' : pct >= 90 ? 'hot' : ''}"><i style="width:${pct}%"></i></div></td><td>${n.stats ? `${n.stats.load.toFixed(2)} · ${n.stats.freeMb} MB free` : '<span class="sub">No data</span>'}</td><td class="act">${n.remote ? `<button class="button btn-sm button-danger" data-act="delete-node" data-id="${esc(n.id)}">Delete</button>` : ''}</td></tr>`;
+  }), ['No nodes']);
 
-loadUsers();
-
-// ---- plans, codes, registration ----
-const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(async r => ({ ok: r.ok, data: await r.json().catch(() => ({})) }));
-
-async function loadCodes() {
-  const response = await fetch('/api/admin/codes'); if (!response.ok) return;
-  const { codes } = await response.json();
-  document.querySelector('#code-count').textContent = `${codes.length} code${codes.length === 1 ? '' : 's'}`;
-  const list = document.querySelector('#code-list');
-  if (!codes.length) { list.innerHTML = '<span class="empty-route">No codes yet. Generate some →</span>'; return; }
-  list.innerHTML = codes.map(c => {
+  $('#codes').innerHTML = table(['Code', 'Grants', 'Used', 'Expires', 'Note', 'Status', ''], D.codes.map(c => {
     const expired = c.expiresAt && new Date(c.expiresAt) < new Date(), full = c.maxUses !== null && c.uses >= c.maxUses;
-    const state = c.disabled ? 'disabled' : expired ? 'expired' : full ? 'used up' : 'active';
-    return `<div class="route-point user-row"><div class="urow"><div><strong>${esc(c._id)}</strong><span>${esc(c.plan)} · ${c.days}d · ${c.uses}/${c.maxUses === null ? '∞' : c.maxUses} used${c.expiresAt ? ' · until ' + new Date(c.expiresAt).toLocaleDateString() : ''}${c.note ? ' · ' + esc(c.note) : ''}</span></div></div>
-      <div class="badges"><span class="badge ${state === 'active' ? 'new' : ''}">${state}</span><button class="point-go copy-code" data-code="${esc(c._id)}">Copy</button><button class="point-go toggle-code" data-code="${esc(c._id)}">${c.disabled ? 'Enable' : 'Disable'}</button></div></div>`;
-  }).join('');
+    const st = c.disabled ? pill('', 'Disabled') : expired ? pill('bad', 'Expired') : full ? pill('warn', 'Used up') : pill('ok', 'Active');
+    return `<tr><td class="mono">${esc(c._id)}</td><td>${esc(c.plan)}, ${c.days} days</td><td>${c.uses} / ${c.maxUses === null ? '∞' : c.maxUses}</td><td>${date(c.expiresAt)}</td><td>${esc(c.note || '')}</td><td>${st}</td><td class="act"><button class="button btn-sm" data-act="copy" data-id="${esc(c._id)}">Copy</button><button class="button btn-sm" data-act="toggle-code" data-id="${esc(c._id)}">${c.disabled ? 'Enable' : 'Disable'}</button></td></tr>`;
+  }), ['No codes yet', 'Generate some to sell or give away.']);
+  $('#reg-open').checked = D.reg;
 }
-document.querySelector('#code-list').addEventListener('click', async event => {
-  const copy = event.target.closest('.copy-code'), toggle = event.target.closest('.toggle-code');
-  if (copy) { navigator.clipboard?.writeText(copy.dataset.code); window.toast?.('Code copied', 'ok'); }
-  if (toggle) { await post(`/api/admin/codes/${encodeURIComponent(toggle.dataset.code)}/toggle`); loadCodes(); }
-});
-document.querySelector('#code-form').addEventListener('submit', async event => {
-  event.preventDefault();
-  const msg = document.querySelector('#code-message'), v = id => document.querySelector(id).value;
-  const exp = v('#code-exp');
-  const { ok, data } = await post('/api/admin/codes', { plan: v('#code-plan'), days: v('#code-days'), maxUses: v('#code-max') === '' ? null : v('#code-max'), expiresAt: exp ? new Date(exp + 'T23:59:59').toISOString() : null, count: v('#code-count'), note: v('#code-note') });
-  msg.textContent = ok ? `Created: ${data.codes.map(c => c._id).join(', ')}` : data.error || 'Could not create codes.';
-  msg.className = 'form-message ' + (ok ? 'success' : 'error');
-  if (ok) loadCodes();
-});
-const regBox = document.querySelector('#reg-open');
-fetch('/api/admin/settings').then(r => r.json()).then(s => { regBox.checked = s.registrationOpen; });
-regBox.addEventListener('change', async () => { const { data } = await post('/api/admin/settings', { registrationOpen: regBox.checked }); window.toast?.(data.registrationOpen ? 'Registration opened' : 'Registration closed', 'ok'); });
-loadCodes();
 
-// ---- servers (bots) and nodes ----
-async function loadServers() {
-  const [sr, nr] = await Promise.all([fetch('/api/admin/servers'), fetch('/api/admin/nodes')]);
-  if (!sr.ok || !nr.ok) return;
-  const { servers } = await sr.json(), { nodes } = await nr.json();
-  document.querySelector('#srv-node').innerHTML = '<option value="auto">Auto (best node)</option>' + nodes.map(n => `<option value="${esc(n.id)}" ${n.enabled && n.online && n.used < n.maxBots ? '' : 'disabled'}>${esc(n.name)} — ${n.used}/${n.maxBots} bots${n.online ? '' : ' (offline)'}</option>`).join('');
-  document.querySelector('#node-count').textContent = `${nodes.length} node${nodes.length === 1 ? '' : 's'}`;
-  document.querySelector('#node-list').innerHTML = nodes.map(n => `<div class="route-point user-row"><div class="urow"><div><strong>${esc(n.name)}</strong><span>${n.used}/${n.maxBots} bots${n.stats ? ` · load ${n.stats.load.toFixed(2)} · ${n.stats.freeMb} MB free` : ''}${n.remote ? '' : ' · runs on the panel'}</span></div></div>
-    <div class="badges"><span class="badge ${n.online ? 'new' : ''}">${n.online ? 'online' : 'offline'}</span>${n.remote ? `<button class="point-go node-delete" data-id="${esc(n.id)}">Delete</button>` : ''}</div></div>`).join('');
-  document.querySelector('#srv-count').textContent = `${servers.length} bot${servers.length === 1 ? '' : 's'}`;
-  const list = document.querySelector('#srv-list');
-  if (!servers.length) { list.innerHTML = '<span class="empty-route">No bots yet. Create one →</span>'; return; }
-  list.innerHTML = servers.map(s => `<div class="route-point user-row"><div class="urow"><div><strong>${esc(s.name)}</strong><span>${esc(s.owner)} · ${esc(s.label)} · ${s.until ? 'until ' + new Date(s.until).toLocaleDateString() : 'no expiry'} · ${esc(s.node || '?')}</span></div></div>
-    <div class="badges"><span class="badge ${s.active ? 'new' : ''}">${s.suspended ? 'suspended' : s.active ? 'active' : 'expired'}</span>
-    <button class="point-go srv-renew" data-id="${s.id}">+30d</button><button class="point-go srv-suspend" data-id="${s.id}">${s.suspended ? 'Unsuspend' : 'Suspend'}</button><button class="point-go srv-delete" data-id="${s.id}">Delete</button></div></div>`).join('');
+// ---- tabs ----
+function showTab() {
+  const t = location.hash.slice(1) || 'overview';
+  $$('#tabs a').forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + t));
+  $$('main > section').forEach(s => s.hidden = s.id !== 's-' + t);
 }
-function fillOwners() {
-  const me = document.querySelector('#user-chip')?.textContent.trim();
-  const names = [...new Set([me, ...allUsers.map(u => u.username)].filter(n => n && n !== '--'))];
-  const sel = document.querySelector('#srv-owner'), keep = sel.value;
-  sel.innerHTML = names.map(n => `<option>${esc(n)}</option>`).join(''); if (names.includes(keep)) sel.value = keep;
-}
-const baseRender = renderUsers;
-renderUsers = users => { baseRender(users); fillOwners(); };
-document.querySelector('#srv-list').addEventListener('click', async e => {
-  const b = e.target.closest('button'); if (!b) return; const id = b.dataset.id;
-  if (b.classList.contains('srv-delete')) { if (!(await window.confirmAction('Delete this bot? Its saved settings and route are removed.'))) return; await fetch(`/api/admin/servers/${id}`, { method: 'DELETE' }); }
-  else if (b.classList.contains('srv-suspend')) await post(`/api/admin/servers/${id}/suspend`);
-  else if (b.classList.contains('srv-renew')) await post(`/api/admin/servers/${id}/renew`, { days: 30 });
-  loadServers();
-});
-document.querySelector('#srv-form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const v = id => document.querySelector(id).value, msg = document.querySelector('#srv-message');
-  const { ok, data } = await post('/api/admin/servers', { owner: v('#srv-owner'), name: v('#srv-name'), nodeId: v('#srv-node'), plan: v('#srv-plan'), days: v('#srv-days') });
-  msg.textContent = ok ? `Created "${data.server.name}" for ${data.server.owner}.` : data.error || 'Could not create bot.';
-  msg.className = 'form-message ' + (ok ? 'success' : 'error');
-  if (ok) loadServers();
-});
-loadServers();
+addEventListener('hashchange', showTab); showTab();
 
-document.querySelector('#node-list').addEventListener('click', async e => {
-  const b = e.target.closest('.node-delete'); if (!b) return;
-  if (!(await window.confirmAction('Delete this node? Its agent will be disconnected.'))) return;
-  const r = await fetch(`/api/admin/nodes/${b.dataset.id}`, { method: 'DELETE' }); const d = await r.json().catch(() => ({}));
-  if (!r.ok) window.toast?.(d.error || 'Could not delete node', 'warn');
-  loadServers();
+// ---- dialogs ----
+const msg = (id, text, ok) => { const m = $(id); m.textContent = text; m.className = 'msg ' + (ok ? 'ok' : 'err'); };
+document.addEventListener('click', async e => {
+  const open = e.target.closest('[data-open-dlg]');
+  if (open) {
+    const d = $('#' + open.dataset.openDlg);
+    if (d.id === 'dlg-bot') {
+      const me = $('#user-chip').textContent.split(' · ')[0];
+      $('#b-owner').innerHTML = [...new Set([me, ...D.users.map(u => u.username)])].filter(x => x && x !== '--').map(n => `<option>${esc(n)}</option>`).join('');
+      $('#b-node').innerHTML = '<option value="auto">Auto (best node)</option>' + D.nodes.map(n => `<option value="${esc(n.id)}" ${n.enabled && n.online && n.used < n.maxBots ? '' : 'disabled'}>${esc(n.name)}: ${n.used}/${n.maxBots}${n.online ? '' : ' (offline)'}</option>`).join('');
+    }
+    $$('#' + d.id + ' .msg').forEach(m => m.textContent = ''); $$('#' + d.id + ' pre').forEach(p => p.hidden = true);
+    d.showModal(); return;
+  }
+  if (e.target.closest('[data-close]')) { e.target.closest('dialog').close(); return; }
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const id = b.dataset.id, act = b.dataset.act;
+  if (act === 'copy') { navigator.clipboard?.writeText(id); b.textContent = 'Copied'; setTimeout(() => b.textContent = 'Copy', 1200); return; }
+  if (act === 'delete-bot' && !(await window.confirmAction('Delete this bot? Its saved settings and route are removed.'))) return;
+  if (act === 'delete-user' && !(await window.confirmAction(`Remove "${id}"? Their bots are deleted and they lose access.`))) return;
+  if (act === 'delete-node' && !(await window.confirmAction('Delete this node? Its agent will be disconnected.'))) return;
+  const calls = { renew: () => api(`/api/admin/servers/${id}/renew`, 'POST', { days: 30 }), suspend: () => api(`/api/admin/servers/${id}/suspend`, 'POST'), 'delete-bot': () => api(`/api/admin/servers/${id}`, 'DELETE'), 'delete-user': () => api(`/api/admin/users/${encodeURIComponent(id)}`, 'DELETE'), 'delete-node': () => api(`/api/admin/nodes/${id}`, 'DELETE'), 'toggle-code': () => api(`/api/admin/codes/${id}/toggle`, 'POST') };
+  b.disabled = true; const r = await calls[act](); b.disabled = false;
+  if (!r.ok) alert(r.data.error || 'That did not work.');
+  loadAll();
 });
-document.querySelector('#node-form').addEventListener('submit', async e => {
-  e.preventDefault();
-  const msg = document.querySelector('#node-message');
-  const { ok, data } = await post('/api/admin/nodes', { name: document.querySelector('#node-name').value, maxBots: document.querySelector('#node-max').value });
-  msg.textContent = ok ? `Node created. Copy this now, it is shown only once:\n\nPANEL_URL=${location.origin}\nNODE_TOKEN=${data.token}` : data.error || 'Could not create node.';
-  msg.className = 'form-message ' + (ok ? 'success' : 'error');
-  if (ok) { document.querySelector('#node-name').value = ''; loadServers(); }
+$('#user-search').addEventListener('input', render);
+$('#reg-open').addEventListener('change', e => api('/api/admin/settings', 'POST', { registrationOpen: e.target.checked }).then(loadAll));
+
+const submit = (form, msgId, call, done) => $(form).addEventListener('submit', async e => {
+  e.preventDefault(); const btn = e.submitter; btn.disabled = true;
+  const { ok, data } = await call(); btn.disabled = false;
+  if (!ok) return msg(msgId, data.error || 'That did not work.', false);
+  done(data); loadAll();
 });
-setInterval(loadServers, 15000);
+submit('#f-bot', '#m-bot', () => api('/api/admin/servers', 'POST', { owner: $('#b-owner').value, name: $('#b-name').value, nodeId: $('#b-node').value, plan: $('#b-plan').value, days: $('#b-days').value }), () => $('#dlg-bot').close());
+submit('#f-user', '#m-user', () => api('/api/admin/users', 'POST', { username: $('#u-name').value, password: $('#u-pass').value }), () => { $('#f-user').reset(); $('#dlg-user').close(); });
+submit('#f-node', '#m-node', () => api('/api/admin/nodes', 'POST', { name: $('#n-name').value, maxBots: $('#n-max').value }), d => {
+  const p = $('#n-token'); p.hidden = false; p.textContent = `PANEL_URL=${location.origin}\nNODE_TOKEN=${d.token}`;
+  msg('#m-node', 'Node created. Copy these two lines now; the token is shown once.', true);
+});
+submit('#f-code', '#m-code', () => { const x = $('#c-exp').value, m = $('#c-max').value; return api('/api/admin/codes', 'POST', { plan: $('#c-plan').value, days: $('#c-days').value, maxUses: m === '' ? null : m, expiresAt: x ? new Date(x + 'T23:59:59').toISOString() : null, count: $('#c-count').value, note: $('#c-note').value }); }, d => {
+  const p = $('#c-out'); p.hidden = false; p.textContent = d.codes.map(c => c._id).join('\n'); msg('#m-code', `Created ${d.codes.length}.`, true);
+});
+
+loadAll(); setInterval(() => { if (!document.hidden && !$$('dialog[open]').length) loadAll(); }, 15000);
