@@ -7,109 +7,71 @@
     <link rel="icon" type="image/png" href="/aurora-bot.png">
     <link rel="stylesheet" href="/styles.css">
     <link rel="stylesheet" href="/pro.css">
+    <link rel="stylesheet" href="/ui.css">
   </head>
   <body>
     <main class="shell">
       <header class="topbar">
         <div class="brand"><img class="brand-mark" src="/aurora-bot.png" alt="Aurora Bot"><span>Aurora Bot</span></div>
         <div class="topbar-meta">
-          <span class="clock" id="clock">--:--</span>
-          <span class="topbar-divider"></span>
-          <a class="admin-link" href="/">Dashboard</a>
+          <a class="admin-link" href="/servers">My bots</a>
           <span class="user-chip" id="user-chip">--</span>
           <button class="logout-button" id="logout-button" title="Log out">Log out</button>
         </div>
       </header>
+      <div class="head"><div><h1 id="title">Admin</h1><p id="sub">Loading…</p></div></div>
+      <nav class="tabs-h" id="tabs"><a href="#overview">Overview</a><a href="#bots">Bots</a><a href="#users">Users</a><a href="#nodes">Nodes</a><a href="#codes">Codes</a></nav>
 
-      <section class="hero-row">
-        <div>
-          <h1>Give people access.</h1>
-          <p class="lede">Create an account for each person who should run their own bot. People can also register themselves; accounts have no bots until you create one for them below or they redeem a code.</p>
-        </div>
+      <section id="s-overview">
+        <div class="kpis" id="kpis"></div>
+        <div class="card"><div class="card-h"><h2 id="att-title">Needs attention</h2></div><div class="tw" id="attention"></div></div>
       </section>
 
-      <section class="workspace admin-workspace">
-        <div class="panel console-panel">
-          <div class="panel-heading">
-            <h2>Existing users</h2>
-            <div style="display:flex;gap:10px;align-items:center"><input id="user-search" placeholder="Search users..." style="width:170px" aria-label="Search users"><span class="event-count" id="user-count">0 users</span></div>
-          </div>
-          <div class="user-list" id="user-list"><span class="empty-route">No users yet. Create the first one →</span></div>
-        </div>
-
-        <aside class="panel controls-panel">
-          <div class="panel-heading"><h2>Create a user</h2></div>
-          <form class="config-form" id="create-user-form" style="border-top:0;">
-            <label>Username<input id="new-username" required autocomplete="off" placeholder="e.g. jordan"></label>
-            <label>Password<input id="new-password" type="password" required autocomplete="new-password" placeholder="At least 6 characters"></label>
-            <button class="button button-save" type="submit">Create user <span>+</span></button>
-            <p class="form-message" id="create-message"></p>
-          </form>
-          <div class="note"><span class="note-icon">i</span><p>Each user gets their own isolated bot: their own Minecraft server config, connection state, chat log, and saved route. Nothing is shared between accounts.</p></div>
-        </aside>
+      <section id="s-bots" hidden>
+        <div class="card"><div class="card-h"><h2>Bots</h2><div class="tools"><button class="button button-primary btn-sm" data-open-dlg="dlg-bot">Create bot</button></div></div><div class="tw" id="bots"></div></div>
       </section>
 
-      <section class="workspace admin-workspace">
-        <div class="panel console-panel">
-          <div class="panel-heading"><h2>Nodes</h2><span class="event-count" id="node-count">0 nodes</span></div>
-          <div class="user-list" id="node-list"></div>
-        </div>
-        <aside class="panel controls-panel">
-          <div class="panel-heading"><h2>Add a node</h2></div>
-          <form class="config-form" id="node-form" style="border-top:0;">
-            <label>Name<input id="node-name" maxlength="40" required placeholder="e.g. Railway - Sam"></label>
-            <label>Max bots<input id="node-max" type="number" min="1" max="1000" value="10" required></label>
-            <button class="button button-save" type="submit">Add node <span>+</span></button>
-            <p class="form-message" id="node-message" style="white-space:pre-wrap;word-break:break-all"></p>
-          </form>
-        </aside>
+      <section id="s-users" hidden>
+        <div class="card"><div class="card-h"><h2>Users</h2><div class="tools"><input id="user-search" type="search" placeholder="Search users" aria-label="Search users"><button class="button button-primary btn-sm" data-open-dlg="dlg-user">Add user</button></div></div><div class="tw" id="users"></div></div>
       </section>
 
-      <section class="workspace admin-workspace">
-        <div class="panel console-panel">
-          <div class="panel-heading"><h2>Bots</h2><span class="event-count" id="srv-count">0 bots</span></div>
-          <div class="user-list" id="srv-list"><span class="empty-route">No bots yet. Create one →</span></div>
-        </div>
-        <aside class="panel controls-panel">
-          <div class="panel-heading"><h2>Create a bot</h2></div>
-          <form class="config-form" id="srv-form" style="border-top:0;">
-            <label>Owner<select id="srv-owner"></select></label>
-            <label>Name<input id="srv-name" maxlength="40" placeholder="e.g. Farm AFK"></label>
-            <label>Node (emptiest first)<select id="srv-node"></select></label>
-            <label>Type<select id="srv-plan"><option value="basic">Basic</option><option value="pro">Pro (live 3D view)</option><option value="premium">Premium (live 3D view)</option></select></label>
-            <label>Days (blank = no expiry)<input id="srv-days" type="number" min="1" max="3650" placeholder="30"></label>
-            <button class="button button-save" type="submit">Create bot <span>+</span></button>
-            <p class="form-message" id="srv-message"></p>
-          </form>
-        </aside>
+      <section id="s-nodes" hidden>
+        <div class="card"><div class="card-h"><h2>Nodes</h2><div class="tools"><button class="button button-primary btn-sm" data-open-dlg="dlg-node">Add node</button></div></div><div class="tw" id="nodes"></div></div>
       </section>
 
-      <section class="workspace admin-workspace">
-        <div class="panel console-panel">
-          <div class="panel-heading"><h2>Access codes</h2><span class="event-count" id="code-count">0 codes</span></div>
-          <div class="user-list" id="code-list"><span class="empty-route">No codes yet. Generate some →</span></div>
-        </div>
-        <aside class="panel controls-panel">
-          <div class="panel-heading"><h2>Generate codes</h2></div>
-          <form class="config-form" id="code-form" style="border-top:0;">
-            <label>Bot type<select id="code-plan"><option value="basic">Basic</option><option value="pro">Pro</option><option value="premium">Premium</option></select></label>
-            <label>Days of access<input id="code-days" type="number" min="1" max="3650" value="30" required></label>
-            <label>Max redemptions (blank = unlimited)<input id="code-max" type="number" min="1" value="1"></label>
-            <label>Code stops working on (optional)<input id="code-exp" type="date"></label>
-            <label>How many codes<input id="code-count" type="number" min="1" max="50" value="1"></label>
-            <label>Note<input id="code-note" maxlength="80" placeholder="e.g. buyer name"></label>
-            <button class="button button-save" type="submit">Generate <span>+</span></button>
-            <p class="form-message" id="code-message"></p>
-          </form>
-          <label class="reg-toggle"><input type="checkbox" id="reg-open"> Open registration</label>
-        </aside>
+      <section id="s-codes" hidden>
+        <div class="card"><div class="card-h"><h2>Access codes</h2><div class="tools"><label class="sub" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="reg-open"> Open registration</label><button class="button button-primary btn-sm" data-open-dlg="dlg-code">Generate codes</button></div></div><div class="tw" id="codes"></div></div>
       </section>
-
-      <footer class="footer"><span>Aurora Bot</span><span>Admin panel</span></footer>
     </main>
+
+    <dialog id="dlg-bot"><form id="f-bot"><h2>Create a bot</h2>
+      <label>Owner<select id="b-owner"></select></label>
+      <label>Name<input id="b-name" maxlength="40" placeholder="e.g. Farm AFK"></label>
+      <label>Node<select id="b-node"></select></label>
+      <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><label>Type<select id="b-plan"><option value="basic">Basic</option><option value="pro">Pro</option><option value="premium">Premium</option></select></label>
+      <label>Days (blank = none)<input id="b-days" type="number" min="1" max="3650" placeholder="30"></label></div>
+      <p class="msg" id="m-bot"></p><div class="row"><button class="button" type="button" data-close>Cancel</button><button class="button button-primary" type="submit">Create bot</button></div></form></dialog>
+
+    <dialog id="dlg-user"><form id="f-user"><h2>Add a user</h2>
+      <label>Username<input id="u-name" required minlength="3" maxlength="32" autocomplete="off"></label>
+      <label>Password<input id="u-pass" type="password" required minlength="6" autocomplete="new-password"></label>
+      <p class="msg" id="m-user"></p><div class="row"><button class="button" type="button" data-close>Cancel</button><button class="button button-primary" type="submit">Add user</button></div></form></dialog>
+
+    <dialog id="dlg-node"><form id="f-node"><h2>Add a node</h2>
+      <label>Name<input id="n-name" required maxlength="40" placeholder="e.g. Railway - Sam"></label>
+      <label>Max bots<input id="n-max" type="number" min="1" max="1000" value="10" required></label>
+      <p class="msg" id="m-node"></p><pre id="n-token" hidden></pre><div class="row"><button class="button" type="button" data-close>Close</button><button class="button button-primary" type="submit">Add node</button></div></form></dialog>
+
+    <dialog id="dlg-code"><form id="f-code"><h2>Generate access codes</h2>
+      <div class="grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><label>Bot type<select id="c-plan"><option value="basic">Basic</option><option value="pro">Pro</option><option value="premium">Premium</option></select></label>
+      <label>Days of access<input id="c-days" type="number" min="1" max="3650" value="30" required></label>
+      <label>Max uses (blank = unlimited)<input id="c-max" type="number" min="1" value="1"></label>
+      <label>How many codes<input id="c-count" type="number" min="1" max="50" value="1"></label></div>
+      <label>Code stops working on (optional)<input id="c-exp" type="date"></label>
+      <label>Note<input id="c-note" maxlength="80" placeholder="e.g. buyer name"></label>
+      <p class="msg" id="m-code"></p><pre id="c-out" hidden></pre><div class="row"><button class="button" type="button" data-close>Close</button><button class="button button-primary" type="submit">Generate</button></div></form></dialog>
 
     <script src="/auth-nav.js"></script>
     <script src="/admin.js"></script>
-      <script src="/fx.js"></script>
   </body>
 </html>
