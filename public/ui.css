@@ -38,3 +38,16 @@ dialog .row{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
 dialog pre{white-space:pre-wrap;word-break:break-all;background:#07090d;border:1px solid var(--line);border-radius:8px;padding:10px;margin:0;font-size:12px;user-select:all}
 .foot-note{color:var(--text-faint);font-size:13px;margin:0}
 @media(max-width:700px){.tbl th,.tbl td{padding:10px 12px}.redeem{width:100%}.redeem input{flex:1;width:auto}}
+
+/* polish pass */
+body{background:radial-gradient(900px 380px at 50% -80px,rgba(111,96,245,.16),transparent 70%),var(--bg);background-repeat:no-repeat}
+.tabs-h{overflow-y:hidden}
+.redeem input{width:260px}
+.kpi{background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,0) 60%),var(--glass);transition:border-color .15s ease}
+.kpi:hover{border-color:var(--line2)}
+.kpi strong{font-size:30px;letter-spacing:-.02em}
+.card{overflow:hidden}.card-h{background:rgba(255,255,255,.015)}
+.tbl th{text-transform:uppercase;letter-spacing:.06em;font-size:11px}
+.empty{padding:48px 18px}.empty strong{font-size:16px}
+.head h1{font-size:28px;letter-spacing:-.02em}
+.shell{min-height:100vh}
