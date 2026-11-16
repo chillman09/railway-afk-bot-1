@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const path = require('path');
+const fs = require('fs');
 const express = require('express');
 const http = require('node:http');
 const session = require('express-session');
@@ -14,6 +15,7 @@ const db = require('./lib/db');
 const userStore = require('./lib/userStore');
 const servers = require('./lib/servers');
 const nodes = require('./lib/nodes');
+const nodeState = require('./lib/nodeState');
 const botApi = require('./lib/botApi');
 const botManager = require('./lib/botManager');
 const { isRateLimited, recordAttempt, clearAttempts } = require('./lib/rateLimiter');
@@ -163,12 +165,31 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-const view = (s, nodeName) => ({ id: s._id, name: s.name, plan: s.plan, label: servers.PLANS[s.plan].label, viewer: servers.PLANS[s.plan].viewer, until: s.until, suspended: s.suspended, active: servers.isActive(s), node: nodeName });
+const view = (s, nodeName, status) => ({ status: status || 'offline', id: s._id, name: s.name, plan: s.plan, label: servers.PLANS[s.plan].label, viewer: servers.PLANS[s.plan].viewer, until: s.until, suspended: s.suspended, active: servers.isActive(s), node: nodeName });
 const mine = async req => (await servers.listForOwner(req.session.user.username));
 
+let nnCache = { at: 0, v: {} };
+async function nodeNames() { // node names rarely change, so don't hit the database on every page load
+  if (Date.now() - nnCache.at < 30000) return nnCache.v;
+  nnCache = { at: Date.now(), v: Object.fromEntries((await servers.listNodes()).map(n => [n.id, n.name])) };
+  return nnCache.v;
+}
+function statusOf(s) {
+  if (s.nodeId === 'local') return botManager.get(s._id)?.state.status || 'offline';
+  if (!nodeState.sockets.has(s.nodeId)) return 'node offline';
+  return nodeState.stats.get(s.nodeId)?.statuses?.[s._id] || 'offline';
+}
+const serversHtml = fs.readFileSync(path.join(__dirname, 'public', 'servers.html'), 'utf8');
+// The bot list is written into the page itself, so it appears on first paint without a second request.
+async function sendServersPage(req, res, list) {
+  const [mineList, names] = await Promise.all([list || servers.listForOwner(req.session.user.username), nodeNames()]);
+  const boot = { servers: mineList.map(s => view(s, names[s.nodeId], statusOf(s))), current: req.session.serverId || null };
+  res.set('Cache-Control', 'no-store').type('html').send(serversHtml.replace('<!--BOOT-->', '<script>window.__BOOT=' + JSON.stringify(boot).replace(/</g, '\\u003c') + '</script>'));
+}
+
 app.get('/api/servers', requireAuth, async (req, res) => {
-  const nodeNames = Object.fromEntries((await servers.listNodes()).map(n => [n.id, n.name]));
-  res.json({ servers: (await mine(req)).map(s => view(s, nodeNames[s.nodeId])), current: req.session.serverId || null });
+  const names = await nodeNames();
+  res.json({ servers: (await mine(req)).map(s => view(s, names[s.nodeId], statusOf(s))), current: req.session.serverId || null });
 });
 app.get('/api/servers/current', requireAuth, async (req, res) => {
   const s = req.session.serverId && await servers.getServer(req.session.serverId);
@@ -202,8 +223,8 @@ app.delete('/api/admin/nodes/:id', requireAuth, requireAdmin, async (req, res) =
   try { await nodes.deleteNode(req.params.id); res.json({ ok: true }); } catch (err) { fail(res, err); }
 });
 app.get('/api/admin/servers', requireAuth, requireAdmin, async (req, res) => {
-  const nodeNames = Object.fromEntries((await servers.listNodes()).map(n => [n.id, n.name]));
-  res.json({ servers: (await servers.listAll()).map(s => ({ ...view(s, nodeNames[s.nodeId]), owner: s.owner })) });
+  const names = await nodeNames();
+  res.json({ servers: (await servers.listAll()).map(s => ({ ...view(s, names[s.nodeId], statusOf(s)), owner: s.owner })) });
 });
 app.post('/api/admin/servers', requireAuth, requireAdmin, async (req, res) => {
   try { res.json({ server: await servers.createServer(req.body || {}) }); } catch (err) { fail(res, err); }
@@ -259,7 +280,7 @@ app.get('/admin', requireAuth, requireAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin.html'));
 });
 
-app.get('/servers', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'servers.html')));
+app.get('/servers', requireAuth, (req, res) => sendServersPage(req, res));
 
 app.get('/', async (req, res) => {
   // The same URL shows different pages depending on login, so never cache it.
@@ -269,10 +290,10 @@ app.get('/', async (req, res) => {
   const list = await servers.listForOwner(user.username);
   if (req.session.serverId && list.some(s => s._id === req.session.serverId)) return res.sendFile(path.join(__dirname, 'public', 'index.html'));
   if (list.length === 1) { req.session.serverId = list[0]._id; return req.session.save(() => res.sendFile(path.join(__dirname, 'public', 'index.html'))); }
-  res.sendFile(path.join(__dirname, 'public', 'servers.html')); // none or several: pick / redeem
+  sendServersPage(req, res, list); // none or several: pick / redeem
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '10m', setHeaders: (res, p) => { if (p.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache'); } }));
 
 // ---------------------------------------------------------------------------
 // Bot control API — each request acts on the bot (server) this session has
